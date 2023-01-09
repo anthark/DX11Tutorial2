@@ -2,7 +2,7 @@
 //
 
 #include "framework.h"
-#include "1. Window.h"
+#include "1.Window.h"
 
 #define MAX_LOADSTRING 100
 

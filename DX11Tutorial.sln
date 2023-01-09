@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.30523.141
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "1. Window", "1. Window\1. Window.vcxproj", "{71975AA9-8D68-4938-87EF-E8505F74F868}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "1.Window", "1.Window\1.Window.vcxproj", "{71975AA9-8D68-4938-87EF-E8505F74F868}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "2.Device", "2.Device\2.Device.vcxproj", "{492E61EE-663F-400A-91D9-2083C511119C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{71975AA9-8D68-4938-87EF-E8505F74F868}.Debug|x64.Build.0 = Debug|x64
 		{71975AA9-8D68-4938-87EF-E8505F74F868}.Release|x64.ActiveCfg = Release|x64
 		{71975AA9-8D68-4938-87EF-E8505F74F868}.Release|x64.Build.0 = Release|x64
+		{492E61EE-663F-400A-91D9-2083C511119C}.Debug|x64.ActiveCfg = Debug|x64
+		{492E61EE-663F-400A-91D9-2083C511119C}.Debug|x64.Build.0 = Debug|x64
+		{492E61EE-663F-400A-91D9-2083C511119C}.Release|x64.ActiveCfg = Release|x64
+		{492E61EE-663F-400A-91D9-2083C511119C}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
