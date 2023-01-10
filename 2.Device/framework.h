@@ -13,3 +13,23 @@
 #include <malloc.h>
 #include <memory.h>
 #include <tchar.h>
+#include <assert.h>
+
+#define ASSERT_RETURN(expr, returnValue) \
+{\
+   bool value = (expr);\
+   assert(value);\
+   if (!value)\
+   {\
+      return returnValue;\
+   }\
+}
+
+#define SAFE_RELEASE(p)\
+{\
+    if (p != nullptr)\
+    {\
+        p->Release();\
+        p = nullptr;\
+    }\
+}

@@ -3,6 +3,7 @@
 
 #include "framework.h"
 #include "2.Device.h"
+#include "Renderer.h"
 
 #define MAX_LOADSTRING 100
 
@@ -20,10 +21,12 @@ INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 UINT                WindowWidth = 1280;
 UINT                WindowHeight = 720;
 
+Renderer* pRenderer = nullptr;
+
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
-                     _In_opt_ HINSTANCE hPrevInstance,
-                     _In_ LPWSTR    lpCmdLine,
-                     _In_ int       nCmdShow)
+    _In_opt_ HINSTANCE hPrevInstance,
+    _In_ LPWSTR    lpCmdLine,
+    _In_ int       nCmdShow)
 {
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
@@ -36,7 +39,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     MyRegisterClass(hInstance);
 
     // Perform application initialization:
-    if (!InitInstance (hInstance, nCmdShow))
+    if (!InitInstance(hInstance, nCmdShow))
     {
         return FALSE;
     }
@@ -61,9 +64,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
             }
         }
         //OutputDebugString(_T("Render\n"));
+        pRenderer->Render();
     }
 
-    return (int) msg.wParam;
+    pRenderer->Term();
+    delete pRenderer;
+
+    return (int)msg.wParam;
 }
 
 
@@ -79,17 +86,18 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 
     wcex.cbSize = sizeof(WNDCLASSEX);
 
-    wcex.style          = CS_HREDRAW | CS_VREDRAW;
-    wcex.lpfnWndProc    = WndProc;
-    wcex.cbClsExtra     = 0;
-    wcex.cbWndExtra     = 0;
-    wcex.hInstance      = hInstance;
-    wcex.hIcon          = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_MY1WINDOW));
-    wcex.hCursor        = LoadCursor(nullptr, IDC_ARROW);
-    wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);
-    wcex.lpszMenuName   = MAKEINTRESOURCEW(IDC_MY2DEVICE);
-    wcex.lpszClassName  = szWindowClass;
-    wcex.hIconSm        = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
+    wcex.style = CS_HREDRAW | CS_VREDRAW;
+    wcex.lpfnWndProc = WndProc;
+    wcex.cbClsExtra = 0;
+    wcex.cbWndExtra = 0;
+    wcex.hInstance = hInstance;
+    wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_MY1WINDOW));
+    wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    //wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wcex.hbrBackground = nullptr;
+    wcex.lpszMenuName = MAKEINTRESOURCEW(IDC_MY2DEVICE);
+    wcex.lpszClassName = szWindowClass;
+    wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
 
     return RegisterClassExW(&wcex);
 }
@@ -106,33 +114,40 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 //
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
-   hInst = hInstance; // Store instance handle in our global variable
+    hInst = hInstance; // Store instance handle in our global variable
 
-   HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-      CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
+    HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
 
-   if (!hWnd)
-   {
-      return FALSE;
-   }
+    if (!hWnd)
+    {
+        return FALSE;
+    }
 
-   ShowWindow(hWnd, nCmdShow);
-   UpdateWindow(hWnd);
+    pRenderer = new Renderer();
+    if (!pRenderer->Init(hWnd))
+    {
+        delete pRenderer;
+        return FALSE;
+    }
 
-   // Adjust window size
-   {
-       RECT rc;
-       rc.left = 0;
-       rc.right = WindowWidth;
-       rc.top = 0;
-       rc.bottom = WindowHeight;
+    ShowWindow(hWnd, nCmdShow);
+    UpdateWindow(hWnd);
 
-       AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, TRUE);
+    // Adjust window size
+    {
+        RECT rc;
+        rc.left = 0;
+        rc.right = WindowWidth;
+        rc.top = 0;
+        rc.bottom = WindowHeight;
 
-       MoveWindow(hWnd, 100, 100, rc.right - rc.left, rc.bottom - rc.top, TRUE);
-   }
+        AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, TRUE);
 
-   return TRUE;
+        MoveWindow(hWnd, 100, 100, rc.right - rc.left, rc.bottom - rc.top, TRUE);
+    }
+
+    return TRUE;
 }
 
 //
@@ -149,23 +164,31 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
     {
-    case WM_COMMAND:
+    case WM_SIZE:
+        if (pRenderer != NULL)
         {
-            int wmId = LOWORD(wParam);
-            // Parse the menu selections:
-            switch (wmId)
-            {
-            case IDM_ABOUT:
-                DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
-                break;
-            case IDM_EXIT:
-                DestroyWindow(hWnd);
-                break;
-            default:
-                return DefWindowProc(hWnd, message, wParam, lParam);
-            }
+            RECT rc;
+            GetClientRect(hWnd, &rc);
+            pRenderer->Resize(rc.right - rc.left, rc.bottom - rc.top);
         }
         break;
+    case WM_COMMAND:
+    {
+        int wmId = LOWORD(wParam);
+        // Parse the menu selections:
+        switch (wmId)
+        {
+        case IDM_ABOUT:
+            DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
+            break;
+        case IDM_EXIT:
+            DestroyWindow(hWnd);
+            break;
+        default:
+            return DefWindowProc(hWnd, message, wParam, lParam);
+        }
+    }
+    break;
     case WM_DESTROY:
         PostQuitMessage(0);
         break;
