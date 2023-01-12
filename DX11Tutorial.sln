@@ -9,6 +9,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "2.Device", "2.Device\2.Devi
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "3.Triangle", "3.Triangle\3.Triangle.vcxproj", "{F466C847-21FB-4D43-9842-35DCDEEEC809}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "4.Matrices", "4.Matrices\4.Matrices.vcxproj", "{DD59AB6A-B364-460A-8131-AB9E84D36169}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -27,6 +29,10 @@ Global
 		{F466C847-21FB-4D43-9842-35DCDEEEC809}.Debug|x64.Build.0 = Debug|x64
 		{F466C847-21FB-4D43-9842-35DCDEEEC809}.Release|x64.ActiveCfg = Release|x64
 		{F466C847-21FB-4D43-9842-35DCDEEEC809}.Release|x64.Build.0 = Release|x64
+		{DD59AB6A-B364-460A-8131-AB9E84D36169}.Debug|x64.ActiveCfg = Debug|x64
+		{DD59AB6A-B364-460A-8131-AB9E84D36169}.Debug|x64.Build.0 = Debug|x64
+		{DD59AB6A-B364-460A-8131-AB9E84D36169}.Release|x64.ActiveCfg = Release|x64
+		{DD59AB6A-B364-460A-8131-AB9E84D36169}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
