@@ -18,6 +18,7 @@ public:
         , m_pPixelShader(nullptr)
         , m_pVertexShader(nullptr)
         , m_pInputLayout(nullptr)
+        , m_pRasterizerState(nullptr)
         , m_usec(0)
     {}
 
@@ -49,6 +50,8 @@ private:
     ID3D11PixelShader* m_pPixelShader;
     ID3D11VertexShader* m_pVertexShader;
     ID3D11InputLayout* m_pInputLayout;
+
+    ID3D11RasterizerState* m_pRasterizerState;
 
     UINT m_width;
     UINT m_height;

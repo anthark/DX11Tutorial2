@@ -154,7 +154,7 @@ bool Renderer::Update()
 
     double elapsedSec = (usec - m_usec) / 1000000.0;
 
-    double angle = elapsedSec * 2 * M_PI;
+    double angle = elapsedSec * M_PI * 0.5;
 
     GeomBuffer geomBuffer;
 
@@ -164,7 +164,20 @@ bool Renderer::Update()
     Matrix4f view;
     view.Offset(Point3f(0, 0, -0.5f));
 
-    geomBuffer.m = geomBuffer.m * view.Inverse();
+    // Projection matrix
+    float f = 100.0f;
+    float n = 0.1f;
+    float fov = (float)M_PI / 3;
+    float c = 1.0f / tanf(fov / 2);
+    float aspectRatio = (float)m_height / m_width;
+    Matrix4f proj;
+    proj.m[0] = c;
+    proj.m[5] = aspectRatio * c;
+    proj.m[10] = f / (f - n);
+    proj.m[11] = 1.0f;
+    proj.m[14] = -n * f / (f - n);
+
+    geomBuffer.m = geomBuffer.m * view.Inverse() * proj;
 
     m_pDeviceContext->UpdateSubresource(m_pGeomBuffer, 0, nullptr, &geomBuffer, 0, 0);
 
@@ -196,6 +209,8 @@ bool Renderer::Render()
     rect.right = m_width;
     rect.bottom = m_height;
     m_pDeviceContext->RSSetScissorRects(1, &rect);
+
+    m_pDeviceContext->RSSetState(m_pRasterizerState);
 
     m_pDeviceContext->IASetIndexBuffer(m_pIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
     ID3D11Buffer* vertexBuffers[] = {m_pVertexBuffer};
@@ -359,11 +374,36 @@ HRESULT Renderer::InitScene()
         }
     }
 
+    // No culling rasterizer state
+    if (SUCCEEDED(result))
+    {
+        D3D11_RASTERIZER_DESC desc = {};
+        desc.AntialiasedLineEnable = FALSE;
+        desc.FillMode = D3D11_FILL_SOLID;
+        desc.CullMode = D3D11_CULL_NONE;
+        desc.FrontCounterClockwise = FALSE;
+        desc.DepthBias = 0;
+        desc.SlopeScaledDepthBias = 0.0f;
+        desc.DepthBiasClamp = 0.0f;
+        desc.DepthClipEnable = TRUE;
+        desc.ScissorEnable = FALSE;
+        desc.MultisampleEnable = FALSE;
+
+        result = m_pDevice->CreateRasterizerState(&desc, &m_pRasterizerState);
+        assert(SUCCEEDED(result));
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pRasterizerState, "RasterizerState");
+        }
+    }
+
     return result;
 }
 
 void Renderer::TermScene()
 {
+    SAFE_RELEASE(m_pRasterizerState);
+
     SAFE_RELEASE(m_pInputLayout);
     SAFE_RELEASE(m_pPixelShader);
     SAFE_RELEASE(m_pVertexShader);
