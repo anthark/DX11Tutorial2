@@ -5,6 +5,8 @@
 #include "4.Matrices.h"
 #include "Renderer.h"
 
+#include <windowsx.h>
+
 #define MAX_LOADSTRING 100
 
 // Global Variables:
@@ -22,6 +24,8 @@ UINT                WindowWidth = 1280;
 UINT                WindowHeight = 720;
 
 Renderer* pRenderer = nullptr;
+
+bool PressedKeys[0xff] = {};
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     _In_opt_ HINSTANCE hPrevInstance,
@@ -180,13 +184,56 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     switch (message)
     {
     case WM_SIZE:
-        if (pRenderer != NULL)
+        if (pRenderer != nullptr)
         {
             RECT rc;
             GetClientRect(hWnd, &rc);
             pRenderer->Resize(rc.right - rc.left, rc.bottom - rc.top);
         }
         break;
+    case WM_RBUTTONDOWN:
+        if (pRenderer != nullptr)
+        {
+            pRenderer->MouseRBPressed(true, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+        }
+        break;
+
+    case WM_RBUTTONUP:
+        if (pRenderer != nullptr)
+        {
+            pRenderer->MouseRBPressed(false, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+        }
+        break;
+
+    case WM_MOUSEMOVE:
+        if (pRenderer != nullptr)
+        {
+            pRenderer->MouseMoved(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+        }
+        break;
+
+    case WM_MOUSEWHEEL:
+        if (pRenderer != nullptr)
+        {
+            pRenderer->MouseWheel(GET_WHEEL_DELTA_WPARAM(wParam));
+        }
+        break;
+
+    case WM_KEYDOWN:
+        if (!PressedKeys[wParam])
+        {
+            if (pRenderer != nullptr)
+            {
+                pRenderer->KeyPressed((int)wParam);
+            }
+            PressedKeys[wParam] = true;
+        }
+        break;
+
+    case WM_KEYUP:
+        PressedKeys[wParam] = false;
+        break;
+
     case WM_COMMAND:
     {
         int wmId = LOWORD(wParam);

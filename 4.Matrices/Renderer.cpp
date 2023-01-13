@@ -22,6 +22,14 @@ struct GeomBuffer
     DirectX::XMMATRIX m;
 };
 
+struct SceneBuffer
+{
+    DirectX::XMMATRIX vp;
+};
+
+static const float CameraRotationSpeed = (float)M_PI * 2.0f;
+static const float ModelRotationSpeed = (float)M_PI / 2.0f;
+
 bool Renderer::Init(HWND hWnd)
 {
     HRESULT result;
@@ -103,6 +111,15 @@ bool Renderer::Init(HWND hWnd)
         result = InitScene();
     }
 
+    // Initial camera setup
+    if (SUCCEEDED(result))
+    {
+        m_camera.poi = Point3f{ 0,0,0 };
+        m_camera.r = 5.0f;
+        m_camera.phi = -(float)M_PI/4;
+        m_camera.theta = (float)M_PI/4;
+    }
+
     SAFE_RELEASE(pSelectedAdapter);
     SAFE_RELEASE(pFactory);
 
@@ -147,19 +164,42 @@ void Renderer::Term()
 bool Renderer::Update()
 {
     size_t usec = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-    if (m_usec == 0)
+    if (m_prevUSec == 0)
     {
-        m_usec = usec; // Initial update
+        m_prevUSec = usec; // Initial update
     }
 
-    double elapsedSec = (usec - m_usec) / 1000000.0;
+    if (m_rotateModel)
+    {
+        double deltaSec = (usec - m_prevUSec) / 1000000.0;
+        m_angle = m_angle + deltaSec * ModelRotationSpeed;
 
-    double angle = elapsedSec * M_PI * 0.5;
+        GeomBuffer geomBuffer;
 
-    GeomBuffer geomBuffer;
+        // Model matrix
+        // Angle is reversed, as DirectXMath calculates it as clockwise
+        DirectX::XMMATRIX m = DirectX::XMMatrixRotationAxis(DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f), -(float)m_angle);
 
-    DirectX::XMMATRIX m = DirectX::XMMatrixRotationAxis(DirectX::XMVectorSet(0.0f, -1.0f, 0.0f, 1.0f), (float)angle);
-    DirectX::XMMATRIX v = DirectX::XMMatrixInverse(nullptr, DirectX::XMMatrixTranslation(0, 0, -2.0f));
+        geomBuffer.m = m;
+
+        m_pDeviceContext->UpdateSubresource(m_pGeomBuffer, 0, nullptr, &geomBuffer, 0, 0);
+    }
+
+    m_prevUSec = usec;
+
+    // Setup camera
+    DirectX::XMMATRIX v;
+    {
+        Point3f pos = m_camera.poi + Point3f{ cosf(m_camera.theta) * cosf(m_camera.phi), sinf(m_camera.theta), cosf(m_camera.theta) * sinf(m_camera.phi) } *m_camera.r;
+        float upTheta = m_camera.theta + (float)M_PI / 2;
+        Point3f up = Point3f{ cosf(upTheta) * cosf(m_camera.phi), sinf(upTheta), cosf(upTheta) * sinf(m_camera.phi) };
+
+        v = DirectX::XMMatrixLookAtLH(
+            DirectX::XMVectorSet(pos.x, pos.y, pos.z, 0.0f),
+            DirectX::XMVectorSet(m_camera.poi.x, m_camera.poi.y, m_camera.poi.z, 0.0f),
+            DirectX::XMVectorSet(up.x, up.y, up.z, 0.0f)
+        );
+    }
 
     float f = 100.0f;
     float n = 0.1f;
@@ -168,11 +208,19 @@ bool Renderer::Update()
     float aspectRatio = (float)m_height / m_width;
     DirectX::XMMATRIX p = DirectX::XMMatrixPerspectiveLH(tanf(fov / 2) * 2 * n, tanf(fov / 2) * 2 * n * aspectRatio, n, f);
 
-    geomBuffer.m = DirectX::XMMatrixMultiply(DirectX::XMMatrixMultiply(m,v),p);
+    D3D11_MAPPED_SUBRESOURCE subresource;
+    HRESULT result = m_pDeviceContext->Map(m_pSceneBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &subresource);
+    assert(SUCCEEDED(result));
+    if (SUCCEEDED(result))
+    {
+        SceneBuffer& sceneBuffer = *reinterpret_cast<SceneBuffer*>(subresource.pData);
 
-    m_pDeviceContext->UpdateSubresource(m_pGeomBuffer, 0, nullptr, &geomBuffer, 0, 0);
+        sceneBuffer.vp = DirectX::XMMatrixMultiply(v, p);
 
-    return true;
+        m_pDeviceContext->Unmap(m_pSceneBuffer, 0);
+    }
+
+    return SUCCEEDED(result);
 }
 
 bool Renderer::Render()
@@ -207,12 +255,12 @@ bool Renderer::Render()
     ID3D11Buffer* vertexBuffers[] = {m_pVertexBuffer};
     UINT strides[] = {16};
     UINT offsets[] = {0};
-    ID3D11Buffer* cbuffers[] = {m_pGeomBuffer};
+    ID3D11Buffer* cbuffers[] = {m_pSceneBuffer, m_pGeomBuffer};
     m_pDeviceContext->IASetVertexBuffers(0, 1, vertexBuffers, strides, offsets);
     m_pDeviceContext->IASetInputLayout(m_pInputLayout);
     m_pDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     m_pDeviceContext->VSSetShader(m_pVertexShader, nullptr, 0);
-    m_pDeviceContext->VSSetConstantBuffers(0, 1, cbuffers);
+    m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
     m_pDeviceContext->PSSetShader(m_pPixelShader, nullptr, 0);
     m_pDeviceContext->DrawIndexed(3, 0, 0);
 
@@ -242,6 +290,49 @@ bool Renderer::Resize(UINT width, UINT height)
     }
 
     return true;
+}
+
+void Renderer::MouseRBPressed(bool pressed, int x, int y)
+{
+    m_rbPressed = pressed;
+    if (m_rbPressed)
+    {
+        m_prevMouseX = x;
+        m_prevMouseY = y;
+    }
+}
+
+void Renderer::MouseMoved(int x, int y)
+{
+    if (m_rbPressed)
+    {
+        float dx = -(float)(x - m_prevMouseX) / m_width * CameraRotationSpeed;
+        float dy = (float)(y - m_prevMouseY) / m_width * CameraRotationSpeed;
+
+        m_camera.phi += dx;
+        m_camera.theta += dy;
+        m_camera.theta = std::min(std::max(m_camera.theta, -(float)M_PI / 2), (float)M_PI / 2);
+
+        m_prevMouseX = x;
+        m_prevMouseY = y;
+    }
+}
+
+void Renderer::MouseWheel(int delta)
+{
+    m_camera.r -= delta / 100.0f;
+    if (m_camera.r < 1.0f)
+    {
+        m_camera.r = 1.0f;
+    }
+}
+
+void Renderer::KeyPressed(int keyCode)
+{
+    if (keyCode == ' ')
+    {
+        m_rotateModel = !m_rotateModel;
+    }
 }
 
 HRESULT Renderer::SetupBackBuffer()
@@ -357,11 +448,37 @@ HRESULT Renderer::InitScene()
         desc.MiscFlags = 0;
         desc.StructureByteStride = 0;
 
-        result = m_pDevice->CreateBuffer(&desc, nullptr, &m_pGeomBuffer);
+        GeomBuffer geomBuffer;
+        geomBuffer.m = DirectX::XMMatrixIdentity();
+
+        D3D11_SUBRESOURCE_DATA data;
+        data.pSysMem = &geomBuffer;
+        data.SysMemPitch = sizeof(geomBuffer);
+        data.SysMemSlicePitch = 0;
+
+        result = m_pDevice->CreateBuffer(&desc, &data, &m_pGeomBuffer);
         assert(SUCCEEDED(result));
         if (SUCCEEDED(result))
         {
             result = SetResourceName(m_pGeomBuffer, "GeomBuffer");
+        }
+    }
+    // Create scene buffer
+    if (SUCCEEDED(result))
+    {
+        D3D11_BUFFER_DESC desc = {};
+        desc.ByteWidth = sizeof(SceneBuffer);
+        desc.Usage = D3D11_USAGE_DYNAMIC;
+        desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+        desc.MiscFlags = 0;
+        desc.StructureByteStride = 0;
+
+        result = m_pDevice->CreateBuffer(&desc, nullptr, &m_pSceneBuffer);
+        assert(SUCCEEDED(result));
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pSceneBuffer, "SceneBuffer");
         }
     }
 
@@ -402,6 +519,7 @@ void Renderer::TermScene()
     SAFE_RELEASE(m_pIndexBuffer);
     SAFE_RELEASE(m_pVertexBuffer);
 
+    SAFE_RELEASE(m_pSceneBuffer);
     SAFE_RELEASE(m_pGeomBuffer);
 }
 
