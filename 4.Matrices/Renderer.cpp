@@ -9,6 +9,8 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 
+#include "../Math/Matrix.h"
+
 struct Vertex
 {
     float x, y, z;
@@ -17,7 +19,7 @@ struct Vertex
 
 struct GeomBuffer
 {
-    float modelMatrix[16];
+    Matrix4f m;
 };
 
 bool Renderer::Init(HWND hWnd)
@@ -155,26 +157,14 @@ bool Renderer::Update()
     double angle = elapsedSec * 2 * M_PI;
 
     GeomBuffer geomBuffer;
-    // Local X
-    geomBuffer.modelMatrix[0] = (float)sin(angle);
-    geomBuffer.modelMatrix[1] = 0.0f;
-    geomBuffer.modelMatrix[2] = (float)cos(angle);
-    geomBuffer.modelMatrix[3] = 0.0f;
-    // Local Y
-    geomBuffer.modelMatrix[4] = 0.0f;
-    geomBuffer.modelMatrix[5] = 1.0f;
-    geomBuffer.modelMatrix[6] = 0.0f;
-    geomBuffer.modelMatrix[7] = 0.0f;
-    // Local Z
-    geomBuffer.modelMatrix[8]  = -(float)cos(angle);
-    geomBuffer.modelMatrix[9]  = 0.0f;
-    geomBuffer.modelMatrix[10] = (float)sin(angle);
-    geomBuffer.modelMatrix[11] = 0.0f;
-    // Local origin
-    geomBuffer.modelMatrix[12] = 0.0f;
-    geomBuffer.modelMatrix[13] = 0.0f;
-    geomBuffer.modelMatrix[14] = 0.0f;
-    geomBuffer.modelMatrix[15] = 1.0f;
+
+    geomBuffer.m.Rotation((float)angle, Point3f(0.0f, 1.0f, 0.0f));
+
+    // "Camera" offset
+    Matrix4f view;
+    view.Offset(Point3f(0, 0, -0.5f));
+
+    geomBuffer.m = geomBuffer.m * view.Inverse();
 
     m_pDeviceContext->UpdateSubresource(m_pGeomBuffer, 0, nullptr, &geomBuffer, 0, 0);
 
