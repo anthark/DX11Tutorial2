@@ -19,7 +19,7 @@ struct Vertex
 
 struct GeomBuffer
 {
-    Matrix4f m;
+    DirectX::XMMATRIX m;
 };
 
 bool Renderer::Init(HWND hWnd)
@@ -158,26 +158,17 @@ bool Renderer::Update()
 
     GeomBuffer geomBuffer;
 
-    geomBuffer.m.Rotation((float)angle, Point3f(0.0f, 1.0f, 0.0f));
+    DirectX::XMMATRIX m = DirectX::XMMatrixRotationAxis(DirectX::XMVectorSet(0.0f, -1.0f, 0.0f, 1.0f), (float)angle);
+    DirectX::XMMATRIX v = DirectX::XMMatrixInverse(nullptr, DirectX::XMMatrixTranslation(0, 0, -2.0f));
 
-    // "Camera" offset
-    Matrix4f view;
-    view.Offset(Point3f(0, 0, -0.5f));
-
-    // Projection matrix
     float f = 100.0f;
     float n = 0.1f;
     float fov = (float)M_PI / 3;
     float c = 1.0f / tanf(fov / 2);
     float aspectRatio = (float)m_height / m_width;
-    Matrix4f proj;
-    proj.m[0] = c;
-    proj.m[5] = aspectRatio * c;
-    proj.m[10] = f / (f - n);
-    proj.m[11] = 1.0f;
-    proj.m[14] = -n * f / (f - n);
+    DirectX::XMMATRIX p = DirectX::XMMatrixPerspectiveLH(tanf(fov / 2) * 2 * n, tanf(fov / 2) * 2 * n * aspectRatio, n, f);
 
-    geomBuffer.m = geomBuffer.m * view.Inverse() * proj;
+    geomBuffer.m = DirectX::XMMatrixMultiply(DirectX::XMMatrixMultiply(m,v),p);
 
     m_pDeviceContext->UpdateSubresource(m_pGeomBuffer, 0, nullptr, &geomBuffer, 0, 0);
 
