@@ -23,6 +23,12 @@ struct GeomBuffer
     DirectX::XMMATRIX m;
 };
 
+struct SphereGeomBuffer
+{
+    DirectX::XMMATRIX m;
+    Point4f size;
+};
+
 struct SceneBuffer
 {
     DirectX::XMMATRIX vp;
@@ -377,6 +383,19 @@ bool Renderer::Resize(UINT width, UINT height)
             m_height = height;
 
             result = SetupBackBuffer();
+
+            // Setup skybox sphere
+            float n = 0.1f;
+            float fov = (float)M_PI / 3;
+            float halfW = tanf(fov / 2) * n;
+            float halfH = (float)m_height / m_width * halfW;
+
+            float r = sqrtf(n*n + halfH*halfH + halfW*halfW) * 1.1f * 2.0f;
+
+            SphereGeomBuffer geomBuffer;
+            geomBuffer.m = DirectX::XMMatrixIdentity();
+            geomBuffer.size = r;
+            m_pDeviceContext->UpdateSubresource(m_pSphereGeomBuffer, 0, nullptr, &geomBuffer, 0, 0);
         }
 
         return SUCCEEDED(result);
@@ -867,15 +886,16 @@ HRESULT Renderer::InitSphere()
     if (SUCCEEDED(result))
     {
         D3D11_BUFFER_DESC desc = {};
-        desc.ByteWidth = sizeof(GeomBuffer);
+        desc.ByteWidth = sizeof(SphereGeomBuffer);
         desc.Usage = D3D11_USAGE_DEFAULT;
         desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
         desc.CPUAccessFlags = 0;
         desc.MiscFlags = 0;
         desc.StructureByteStride = 0;
 
-        GeomBuffer geomBuffer;
+        SphereGeomBuffer geomBuffer;
         geomBuffer.m = DirectX::XMMatrixIdentity();
+        geomBuffer.size.x = 2.0f;
         //geomBuffer.m = DirectX::XMMatrixTranslation(2.0f, 0.0f, 0.0f);
 
         D3D11_SUBRESOURCE_DATA data;
