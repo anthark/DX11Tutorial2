@@ -7,6 +7,8 @@
 
 class Renderer
 {
+    static const double PanSpeed;
+
 public:
     Renderer()
         : m_pDevice(nullptr)
@@ -32,6 +34,8 @@ public:
         , m_pTexture(nullptr)
         , m_pTextureView(nullptr)
         , m_pSampler(nullptr)
+        , m_forwardDelta(0.0)
+        , m_rightDelta(0.0)
     {}
 
     bool Init(HWND hWnd);
@@ -45,6 +49,7 @@ public:
     void MouseMoved(int x, int y);
     void MouseWheel(int delta);
     void KeyPressed(int keyCode);
+    void KeyReleased(int keyCode);
 
 private:
     struct Camera
@@ -53,6 +58,8 @@ private:
         float r;        // Distance to POI
         float phi;      // Angle in plane x0z
         float theta;    // Angle from plane x0z
+
+        void GetDirections(Point3f& forward, Point3f& right);
     };
 
 private:
@@ -93,6 +100,8 @@ private:
     int m_prevMouseY;
     bool m_rotateModel;
     double m_angle;
+    double m_forwardDelta;
+    double m_rightDelta;
 
     size_t m_prevUSec;
 };

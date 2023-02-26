@@ -31,6 +31,30 @@ struct SceneBuffer
 static const float CameraRotationSpeed = (float)M_PI * 2.0f;
 static const float ModelRotationSpeed = (float)M_PI / 2.0f;
 
+static const float Eps = 0.00001f;
+
+void Renderer::Camera::GetDirections(Point3f& forward, Point3f& right)
+{
+    Point3f dir = -Point3f{ cosf(theta) * cosf(phi), sinf(theta), cosf(theta) * sinf(phi) };
+    float upTheta = theta + (float)M_PI / 2;
+    Point3f up = Point3f{ cosf(upTheta) * cosf(phi), sinf(upTheta), cosf(upTheta) * sinf(phi) };
+    right = up.cross(dir);
+    right.y = 0.0f;
+    right.normalize();
+
+    if (fabs(dir.x) > Eps || fabs(dir.z) > Eps)
+    {
+        forward = Point3f{ dir.x, 0.0f, dir.z };
+    }
+    else
+    {
+        forward = Point3f{ up.x, 0.0f, up.z };
+    }
+    forward.normalize();
+}
+
+const double Renderer::PanSpeed = 2.0;
+
 bool Renderer::Init(HWND hWnd)
 {
     HRESULT result;
@@ -170,9 +194,18 @@ bool Renderer::Update()
         m_prevUSec = usec; // Initial update
     }
 
+    double deltaSec = (usec - m_prevUSec) / 1000000.0;
+
+    // Move camera
+    {
+        Point3f cf, cr;
+        m_camera.GetDirections(cf, cr);
+        Point3f d = (cf * (float)m_forwardDelta + cr * (float)m_rightDelta) * (float)deltaSec;
+        m_camera.poi = m_camera.poi + d;
+    }
+
     if (m_rotateModel)
     {
-        double deltaSec = (usec - m_prevUSec) / 1000000.0;
         m_angle = m_angle + deltaSec * ModelRotationSpeed;
 
         GeomBuffer geomBuffer;
@@ -191,7 +224,7 @@ bool Renderer::Update()
     // Setup camera
     DirectX::XMMATRIX v;
     {
-        Point3f pos = m_camera.poi + Point3f{ cosf(m_camera.theta) * cosf(m_camera.phi), sinf(m_camera.theta), cosf(m_camera.theta) * sinf(m_camera.phi) } *m_camera.r;
+        Point3f pos = m_camera.poi + Point3f{ cosf(m_camera.theta) * cosf(m_camera.phi), sinf(m_camera.theta), cosf(m_camera.theta) * sinf(m_camera.phi) } * m_camera.r;
         float upTheta = m_camera.theta + (float)M_PI / 2;
         Point3f up = Point3f{ cosf(upTheta) * cosf(m_camera.phi), sinf(upTheta), cosf(upTheta) * sinf(m_camera.phi) };
 
@@ -336,9 +369,57 @@ void Renderer::MouseWheel(int delta)
 
 void Renderer::KeyPressed(int keyCode)
 {
-    if (keyCode == ' ')
+    switch (keyCode)
     {
-        m_rotateModel = !m_rotateModel;
+        case ' ':
+            m_rotateModel = !m_rotateModel;
+            break;
+
+        case 'W':
+        case 'w':
+            m_forwardDelta += PanSpeed;
+            break;
+
+        case 'S':
+        case 's':
+            m_forwardDelta -= PanSpeed;
+            break;
+
+        case 'D':
+        case 'd':
+            m_rightDelta += PanSpeed;
+            break;
+
+        case 'A':
+        case 'a':
+            m_rightDelta -= PanSpeed;
+            break;
+    }
+}
+
+void Renderer::KeyReleased(int keyCode)
+{
+    switch (keyCode)
+    {
+        case 'W':
+        case 'w':
+            m_forwardDelta -= PanSpeed;
+            break;
+
+        case 'S':
+        case 's':
+            m_forwardDelta += PanSpeed;
+            break;
+
+        case 'D':
+        case 'd':
+            m_rightDelta -= PanSpeed;
+            break;
+
+        case 'A':
+        case 'a':
+            m_rightDelta += PanSpeed;
+            break;
     }
 }
 
@@ -610,7 +691,7 @@ HRESULT Renderer::InitScene()
         D3D11_SAMPLER_DESC desc = {};
 
         //desc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-        //desc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
+        //desc.Filter = D3D11_FILTER_MIN_MAG_POINT_MIP_LINEAR;
         desc.Filter = D3D11_FILTER_ANISOTROPIC;
         desc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
         desc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
