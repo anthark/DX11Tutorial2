@@ -1,6 +1,7 @@
 cbuffer SceneBuffer : register (b0)
 {
     float4x4 vp;
+    float4 cameraPos;
 };
 
 cbuffer GeomBuffer : register (b1)
@@ -23,7 +24,9 @@ VSOutput vs(VSInput vertex)
 {
     VSOutput result;
 
-    result.pos = mul(vp, mul(model, float4(vertex.pos, 1.0)));
+    float3 pos = cameraPos.xyz + vertex.pos;
+
+    result.pos = mul(vp, mul(model, float4(pos, 1.0)));
     result.localPos = vertex.pos;
 
     return result;

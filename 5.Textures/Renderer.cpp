@@ -26,6 +26,7 @@ struct GeomBuffer
 struct SceneBuffer
 {
     DirectX::XMMATRIX vp;
+    Point4f cameraPos;
 };
 
 static const float CameraRotationSpeed = (float)M_PI * 2.0f;
@@ -68,11 +69,11 @@ void CreateSphere(size_t latCells, size_t lonCells, UINT16* pIndices, Point3f* p
         {
             size_t index = lat * lonCells * 6 + lon * 6;
             pIndices[index + 0] = (UINT16)(lat * (latCells + 1) + lon + 0);
-            pIndices[index + 1] = (UINT16)(lat * (latCells + 1) + lon + 1);
-            pIndices[index + 2] = (UINT16)(lat * (latCells + 1) + latCells + 1 + lon);
+            pIndices[index + 2] = (UINT16)(lat * (latCells + 1) + lon + 1);
+            pIndices[index + 1] = (UINT16)(lat * (latCells + 1) + latCells + 1 + lon);
             pIndices[index + 3] = (UINT16)(lat * (latCells + 1) + lon + 1);
-            pIndices[index + 4] = (UINT16)(lat * (latCells + 1) + latCells + 1 + lon + 1);
-            pIndices[index + 5] = (UINT16)(lat * (latCells + 1) + latCells + 1 + lon);
+            pIndices[index + 5] = (UINT16)(lat * (latCells + 1) + latCells + 1 + lon + 1);
+            pIndices[index + 4] = (UINT16)(lat * (latCells + 1) + latCells + 1 + lon);
         }
     }
 }
@@ -269,6 +270,7 @@ bool Renderer::Update()
 
     // Setup camera
     DirectX::XMMATRIX v;
+    Point4f cameraPos;
     {
         Point3f pos = m_camera.poi + Point3f{ cosf(m_camera.theta) * cosf(m_camera.phi), sinf(m_camera.theta), cosf(m_camera.theta) * sinf(m_camera.phi) } * m_camera.r;
         float upTheta = m_camera.theta + (float)M_PI / 2;
@@ -279,6 +281,8 @@ bool Renderer::Update()
             DirectX::XMVectorSet(m_camera.poi.x, m_camera.poi.y, m_camera.poi.z, 0.0f),
             DirectX::XMVectorSet(up.x, up.y, up.z, 0.0f)
         );
+
+        cameraPos = pos;
     }
 
     float f = 100.0f;
@@ -296,6 +300,7 @@ bool Renderer::Update()
         SceneBuffer& sceneBuffer = *reinterpret_cast<SceneBuffer*>(subresource.pData);
 
         sceneBuffer.vp = DirectX::XMMatrixMultiply(v, p);
+        sceneBuffer.cameraPos = cameraPos;
 
         m_pDeviceContext->Unmap(m_pSceneBuffer, 0);
     }
@@ -870,8 +875,8 @@ HRESULT Renderer::InitSphere()
         desc.StructureByteStride = 0;
 
         GeomBuffer geomBuffer;
-        //geomBuffer.m = DirectX::XMMatrixIdentity();
-        geomBuffer.m = DirectX::XMMatrixTranslation(2.0f, 0.0f, 0.0f);
+        geomBuffer.m = DirectX::XMMatrixIdentity();
+        //geomBuffer.m = DirectX::XMMatrixTranslation(2.0f, 0.0f, 0.0f);
 
         D3D11_SUBRESOURCE_DATA data;
         data.pSysMem = &geomBuffer;
