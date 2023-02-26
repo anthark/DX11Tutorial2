@@ -15,4 +15,4 @@ struct TextureDesc
     void* pData = nullptr;
 };
 
-bool LoadDDS(const std::wstring& filepath, TextureDesc& desc);
+bool LoadDDS(const std::wstring& filepath, TextureDesc& desc, bool singleMip = false);

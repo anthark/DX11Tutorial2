@@ -107,7 +107,7 @@ DXGI_FORMAT GetTextureFormat(const DDSHeader& header)
 
 }
 
-bool LoadDDS(const std::wstring& filepath, TextureDesc& desc)
+bool LoadDDS(const std::wstring& filepath, TextureDesc& desc, bool singleMip)
 {
     FILE* pFile = nullptr;
     _wfopen_s(&pFile, filepath.c_str(), L"rb");
@@ -161,6 +161,11 @@ bool LoadDDS(const std::wstring& filepath, TextureDesc& desc)
     // Read mipmap count
     desc.mipmapsCount = (header.flags & DDSD_MIPMAPCOUNT) != 0 ? (UINT32)header.mipMapCount : 1;
 
+    if (singleMip)
+    {
+        desc.mipmapsCount = 1;
+    }
+
     // Read texture format
     desc.fmt = GetTextureFormat(header);
     if (desc.fmt == DXGI_FORMAT_UNKNOWN)
@@ -186,7 +191,7 @@ bool LoadDDS(const std::wstring& filepath, TextureDesc& desc)
     {
         UINT32 levelSize = dataSize / 4;
         // We have top level size - let's calculate the whole size
-        for (UINT32 i = 1; i < header.mipMapCount; i++)
+        for (UINT32 i = 1; i < desc.mipmapsCount; i++)
         {
             dataSize += levelSize;
             levelSize = std::max(16u, levelSize / 4);

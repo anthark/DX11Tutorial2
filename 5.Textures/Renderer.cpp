@@ -746,6 +746,8 @@ HRESULT Renderer::InitScene()
         {
             result = SetResourceName(m_pTexture, WCSToMBS(TextureName));
         }
+
+        free(textureDesc.pData);
     }
     if (SUCCEEDED(result))
     {
@@ -782,6 +784,11 @@ HRESULT Renderer::InitScene()
     if (SUCCEEDED(result))
     {
         result = InitSphere();
+        assert(SUCCEEDED(result));
+    }
+    if (SUCCEEDED(result))
+    {
+        result = InitCubemap();
         assert(SUCCEEDED(result));
     }
 
@@ -914,6 +921,81 @@ HRESULT Renderer::InitSphere()
     return result;
 }
 
+HRESULT Renderer::InitCubemap()
+{
+    HRESULT result = S_OK;
+
+    DXGI_FORMAT textureFmt;
+    if (SUCCEEDED(result))
+    {
+        const std::wstring TextureNames[6] =
+        {
+            L"../Common/posx.dds", L"../Common/negx.dds",
+            L"../Common/posy.dds", L"../Common/negy.dds",
+            L"../Common/posz.dds", L"../Common/negz.dds"
+        };
+        TextureDesc texDescs[6];
+        bool ddsRes = true;
+        for (int i = 0; i < 6 && ddsRes; i++)
+        {
+            ddsRes = LoadDDS(TextureNames[i].c_str(), texDescs[i], true);
+        }
+
+        textureFmt = texDescs[0].fmt; // Assume all are the same
+
+        D3D11_TEXTURE2D_DESC desc = {};
+        desc.Format = textureFmt;
+        desc.ArraySize = 6;
+        desc.MipLevels = 1;
+        desc.Usage = D3D11_USAGE_IMMUTABLE;
+        desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = D3D11_RESOURCE_MISC_TEXTURECUBE;
+        desc.SampleDesc.Count = 1;
+        desc.SampleDesc.Quality = 0;
+        desc.Height = texDescs[0].height;
+        desc.Width = texDescs[0].width;
+
+        UINT32 blockWidth = DivUp(desc.Width, 4u);
+        UINT32 blockHeight = DivUp(desc.Height, 4u);
+        UINT32 pitch = blockWidth * GetBytesPerBlock(desc.Format);
+
+        D3D11_SUBRESOURCE_DATA data[6];
+        for (int i = 0; i < 6; i++)
+        {
+            data[i].pSysMem = texDescs[i].pData;
+            data[i].SysMemPitch = pitch;
+            data[i].SysMemSlicePitch = 0;
+        }
+        result = m_pDevice->CreateTexture2D(&desc, data, &m_pCubemapTexture);
+        assert(SUCCEEDED(result));
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pCubemapTexture, "CubemapTexture");
+        }
+        for (int i = 0; i < 6; i++)
+        {
+            free(texDescs[i].pData);
+        }
+    }
+    if (SUCCEEDED(result))
+    {
+        D3D11_SHADER_RESOURCE_VIEW_DESC desc;
+        desc.Format = textureFmt;
+        desc.ViewDimension = D3D_SRV_DIMENSION_TEXTURECUBE;
+        desc.TextureCube.MipLevels = 1;
+        desc.TextureCube.MostDetailedMip = 0;
+
+        result = m_pDevice->CreateShaderResourceView(m_pCubemapTexture, &desc, &m_pCubemapView);
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pCubemapView, "CubemapView");
+        }
+    }
+
+    return result;
+}
+
 void Renderer::TermScene()
 {
     SAFE_RELEASE(m_pSampler);
@@ -942,10 +1024,19 @@ void Renderer::TermScene()
     SAFE_RELEASE(m_pSphereVertexBuffer);
 
     SAFE_RELEASE(m_pSphereGeomBuffer);
+
+    SAFE_RELEASE(m_pCubemapTexture);
+    SAFE_RELEASE(m_pCubemapView);
 }
 
 void Renderer::RenderSphere()
 {
+    ID3D11SamplerState* samplers[] = { m_pSampler };
+    m_pDeviceContext->PSSetSamplers(0, 1, samplers);
+
+    ID3D11ShaderResourceView* resources[] = { m_pCubemapView };
+    m_pDeviceContext->PSSetShaderResources(0, 1, resources);
+
     m_pDeviceContext->IASetIndexBuffer(m_pSphereIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
     ID3D11Buffer* vertexBuffers[] = { m_pSphereVertexBuffer };
     UINT strides[] = { 12 };

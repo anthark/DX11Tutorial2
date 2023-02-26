@@ -31,6 +31,8 @@ public:
         , m_pSphereVertexShader(nullptr)
         , m_pSphereInputLayout(nullptr)
         , m_sphereIndexCount(0)
+        , m_pCubemapTexture(nullptr)
+        , m_pCubemapView(nullptr)
         , m_pRasterizerState(nullptr)
         , m_prevUSec(0)
         , m_rbPressed(false)
@@ -73,6 +75,7 @@ private:
     HRESULT SetupBackBuffer();
     HRESULT InitScene();
     HRESULT InitSphere();
+    HRESULT InitCubemap();
     void TermScene();
 
     void RenderSphere();
@@ -104,6 +107,9 @@ private:
     ID3D11VertexShader* m_pSphereVertexShader;
     ID3D11InputLayout* m_pSphereInputLayout;
     UINT m_sphereIndexCount;
+
+    ID3D11Texture2D* m_pCubemapTexture;
+    ID3D11ShaderResourceView* m_pCubemapView;
 
     ID3D11RasterizerState* m_pRasterizerState;
 
