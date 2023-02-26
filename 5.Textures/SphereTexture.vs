@@ -16,6 +16,7 @@ struct VSInput
 struct VSOutput
 {
     float4 pos : SV_Position;
+    float3 localPos : POSITION1;
 };
 
 VSOutput vs(VSInput vertex)
@@ -23,6 +24,7 @@ VSOutput vs(VSInput vertex)
     VSOutput result;
 
     result.pos = mul(vp, mul(model, float4(vertex.pos, 1.0)));
+    result.localPos = vertex.pos;
 
     return result;
 }

@@ -871,7 +871,7 @@ HRESULT Renderer::InitSphere()
 
         GeomBuffer geomBuffer;
         //geomBuffer.m = DirectX::XMMatrixIdentity();
-        geomBuffer.m = DirectX::XMMatrixTranslation(1.0f, 0.0f, 0.0f);
+        geomBuffer.m = DirectX::XMMatrixTranslation(2.0f, 0.0f, 0.0f);
 
         D3D11_SUBRESOURCE_DATA data;
         data.pSysMem = &geomBuffer;
