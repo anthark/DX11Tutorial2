@@ -24,6 +24,13 @@ public:
         , m_pPixelShader(nullptr)
         , m_pVertexShader(nullptr)
         , m_pInputLayout(nullptr)
+        , m_pSphereGeomBuffer(nullptr)
+        , m_pSphereVertexBuffer(nullptr)
+        , m_pSphereIndexBuffer(nullptr)
+        , m_pSpherePixelShader(nullptr)
+        , m_pSphereVertexShader(nullptr)
+        , m_pSphereInputLayout(nullptr)
+        , m_sphereIndexCount(0)
         , m_pRasterizerState(nullptr)
         , m_prevUSec(0)
         , m_rbPressed(false)
@@ -65,7 +72,10 @@ private:
 private:
     HRESULT SetupBackBuffer();
     HRESULT InitScene();
+    HRESULT InitSphere();
     void TermScene();
+
+    void RenderSphere();
 
     HRESULT CompileAndCreateShader(const std::wstring& path, ID3D11DeviceChild** ppShader, ID3DBlob** ppCode = nullptr);
 
@@ -77,13 +87,23 @@ private:
     ID3D11RenderTargetView* m_pBackBufferRTV;
 
     ID3D11Buffer* m_pSceneBuffer;
+
+    // For cube
     ID3D11Buffer* m_pGeomBuffer;
     ID3D11Buffer* m_pVertexBuffer;
     ID3D11Buffer* m_pIndexBuffer;
-
     ID3D11PixelShader* m_pPixelShader;
     ID3D11VertexShader* m_pVertexShader;
     ID3D11InputLayout* m_pInputLayout;
+
+    // For sphere
+    ID3D11Buffer* m_pSphereGeomBuffer;
+    ID3D11Buffer* m_pSphereVertexBuffer;
+    ID3D11Buffer* m_pSphereIndexBuffer;
+    ID3D11PixelShader* m_pSpherePixelShader;
+    ID3D11VertexShader* m_pSphereVertexShader;
+    ID3D11InputLayout* m_pSphereInputLayout;
+    UINT m_sphereIndexCount;
 
     ID3D11RasterizerState* m_pRasterizerState;
 

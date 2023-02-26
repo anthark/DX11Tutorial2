@@ -33,6 +33,52 @@ static const float ModelRotationSpeed = (float)M_PI / 2.0f;
 
 static const float Eps = 0.00001f;
 
+namespace
+{
+
+void GetSphereDataSize(size_t latCells, size_t lonCells, size_t& indexCount, size_t& vertexCount)
+{
+    vertexCount = (latCells + 1) * (lonCells + 1);
+    indexCount = latCells * lonCells * 6;
+}
+
+void CreateSphere(size_t latCells, size_t lonCells, UINT16* pIndices, Point3f* pPos)
+{
+    for (size_t lat = 0; lat < latCells + 1; lat++)
+    {
+        for (size_t lon = 0; lon < lonCells + 1; lon++)
+        {
+            int index = (int)(lat * (lonCells + 1) + lon);
+            float lonAngle = 2.0f * (float)M_PI * lon / lonCells + (float)M_PI;
+            float latAngle = -(float)M_PI / 2 + (float)M_PI * lat / latCells;
+
+            Point3f r = Point3f{
+                sinf(lonAngle) * cosf(latAngle),
+                sinf(latAngle),
+                cosf(lonAngle) * cosf(latAngle)
+            };
+
+            pPos[index] = r * 0.5f;
+        }
+    }
+
+    for (size_t lat = 0; lat < latCells; lat++)
+    {
+        for (size_t lon = 0; lon < lonCells; lon++)
+        {
+            size_t index = lat * lonCells * 6 + lon * 6;
+            pIndices[index + 0] = (UINT16)(lat * (latCells + 1) + lon + 0);
+            pIndices[index + 1] = (UINT16)(lat * (latCells + 1) + lon + 1);
+            pIndices[index + 2] = (UINT16)(lat * (latCells + 1) + latCells + 1 + lon);
+            pIndices[index + 3] = (UINT16)(lat * (latCells + 1) + lon + 1);
+            pIndices[index + 4] = (UINT16)(lat * (latCells + 1) + latCells + 1 + lon + 1);
+            pIndices[index + 5] = (UINT16)(lat * (latCells + 1) + latCells + 1 + lon);
+        }
+    }
+}
+
+}
+
 void Renderer::Camera::GetDirections(Point3f& forward, Point3f& right)
 {
     Point3f dir = -Point3f{ cosf(theta) * cosf(phi), sinf(theta), cosf(theta) * sinf(phi) };
@@ -282,6 +328,8 @@ bool Renderer::Render()
     rect.right = m_width;
     rect.bottom = m_height;
     m_pDeviceContext->RSSetScissorRects(1, &rect);
+
+    RenderSphere();
 
     m_pDeviceContext->RSSetState(m_pRasterizerState);
 
@@ -707,6 +755,137 @@ HRESULT Renderer::InitScene()
         assert(SUCCEEDED(result));
     }
 
+    if (SUCCEEDED(result))
+    {
+        result = InitSphere();
+        assert(SUCCEEDED(result));
+    }
+
+    return result;
+}
+
+HRESULT Renderer::InitSphere()
+{
+    static const D3D11_INPUT_ELEMENT_DESC InputDesc[] = {
+        {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0}
+    };
+
+    HRESULT result = S_OK;
+
+    static const size_t SphereSteps = 32;
+
+    std::vector<Point3f> sphereVertices;
+    std::vector<UINT16> indices;
+
+    size_t indexCount;
+    size_t vertexCount;
+
+    GetSphereDataSize(SphereSteps, SphereSteps, indexCount, vertexCount);
+
+    sphereVertices.resize(vertexCount);
+    indices.resize(indexCount);
+
+    m_sphereIndexCount = (UINT)indexCount;
+
+    CreateSphere(SphereSteps, SphereSteps, indices.data(), sphereVertices.data());
+
+    // Create vertex buffer
+    if (SUCCEEDED(result))
+    {
+        D3D11_BUFFER_DESC desc = {};
+        desc.ByteWidth = (UINT)(sphereVertices.size() * sizeof(Point3f));
+        desc.Usage = D3D11_USAGE_IMMUTABLE;
+        desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = 0;
+        desc.StructureByteStride = 0;
+
+        D3D11_SUBRESOURCE_DATA data;
+        data.pSysMem = sphereVertices.data();
+        data.SysMemPitch = (UINT)(sphereVertices.size() * sizeof(Point3f));
+        data.SysMemSlicePitch = 0;
+
+        result = m_pDevice->CreateBuffer(&desc, &data, &m_pSphereVertexBuffer);
+        assert(SUCCEEDED(result));
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pSphereVertexBuffer, "SphereVertexBuffer");
+        }
+    }
+
+    // Create index buffer
+    if (SUCCEEDED(result))
+    {
+        D3D11_BUFFER_DESC desc = {};
+        desc.ByteWidth = (UINT)(indices.size() * sizeof(UINT16));
+        desc.Usage = D3D11_USAGE_IMMUTABLE;
+        desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = 0;
+        desc.StructureByteStride = 0;
+
+        D3D11_SUBRESOURCE_DATA data;
+        data.pSysMem = indices.data();
+        data.SysMemPitch = (UINT)(indices.size() * sizeof(UINT16));
+        data.SysMemSlicePitch = 0;
+
+        result = m_pDevice->CreateBuffer(&desc, &data, &m_pSphereIndexBuffer);
+        assert(SUCCEEDED(result));
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pSphereIndexBuffer, "SphereIndexBuffer");
+        }
+    }
+
+    ID3DBlob* pSphereVertexShaderCode = nullptr;
+    if (SUCCEEDED(result))
+    {
+        result = CompileAndCreateShader(L"SphereTexture.vs", (ID3D11DeviceChild**)&m_pSphereVertexShader, &pSphereVertexShaderCode);
+    }
+    if (SUCCEEDED(result))
+    {
+        result = CompileAndCreateShader(L"SphereTexture.ps", (ID3D11DeviceChild**)&m_pSpherePixelShader);
+    }
+
+    if (SUCCEEDED(result))
+    {
+        result = m_pDevice->CreateInputLayout(InputDesc, 1, pSphereVertexShaderCode->GetBufferPointer(), pSphereVertexShaderCode->GetBufferSize(), &m_pSphereInputLayout);
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pSphereInputLayout, "SphereInputLayout");
+        }
+    }
+
+    SAFE_RELEASE(pSphereVertexShaderCode);
+
+    // Create geometry buffer
+    if (SUCCEEDED(result))
+    {
+        D3D11_BUFFER_DESC desc = {};
+        desc.ByteWidth = sizeof(GeomBuffer);
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = 0;
+        desc.StructureByteStride = 0;
+
+        GeomBuffer geomBuffer;
+        //geomBuffer.m = DirectX::XMMatrixIdentity();
+        geomBuffer.m = DirectX::XMMatrixTranslation(1.0f, 0.0f, 0.0f);
+
+        D3D11_SUBRESOURCE_DATA data;
+        data.pSysMem = &geomBuffer;
+        data.SysMemPitch = sizeof(geomBuffer);
+        data.SysMemSlicePitch = 0;
+
+        result = m_pDevice->CreateBuffer(&desc, &data, &m_pSphereGeomBuffer);
+        assert(SUCCEEDED(result));
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pSphereGeomBuffer, "SphereGeomBuffer");
+        }
+    }
+
     return result;
 }
 
@@ -728,6 +907,32 @@ void Renderer::TermScene()
 
     SAFE_RELEASE(m_pSceneBuffer);
     SAFE_RELEASE(m_pGeomBuffer);
+
+    // Term sphere
+    SAFE_RELEASE(m_pSphereInputLayout);
+    SAFE_RELEASE(m_pSpherePixelShader);
+    SAFE_RELEASE(m_pSphereVertexShader);
+
+    SAFE_RELEASE(m_pSphereIndexBuffer);
+    SAFE_RELEASE(m_pSphereVertexBuffer);
+
+    SAFE_RELEASE(m_pSphereGeomBuffer);
+}
+
+void Renderer::RenderSphere()
+{
+    m_pDeviceContext->IASetIndexBuffer(m_pSphereIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
+    ID3D11Buffer* vertexBuffers[] = { m_pSphereVertexBuffer };
+    UINT strides[] = { 12 };
+    UINT offsets[] = { 0 };
+    ID3D11Buffer* cbuffers[] = { m_pSceneBuffer, m_pSphereGeomBuffer };
+    m_pDeviceContext->IASetVertexBuffers(0, 1, vertexBuffers, strides, offsets);
+    m_pDeviceContext->IASetInputLayout(m_pSphereInputLayout);
+    m_pDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    m_pDeviceContext->VSSetShader(m_pSphereVertexShader, nullptr, 0);
+    m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
+    m_pDeviceContext->PSSetShader(m_pSpherePixelShader, nullptr, 0);
+    m_pDeviceContext->DrawIndexed(m_sphereIndexCount, 0, 0);
 }
 
 HRESULT Renderer::CompileAndCreateShader(const std::wstring& path, ID3D11DeviceChild** ppShader, ID3DBlob** ppCode)
