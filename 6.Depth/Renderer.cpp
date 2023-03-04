@@ -18,6 +18,12 @@ struct TextureVertex
     float u, v;
 };
 
+struct ColorVertex
+{
+    float x, y, z;
+    COLORREF color;
+};
+
 struct GeomBuffer
 {
     DirectX::XMMATRIX m;
@@ -272,9 +278,14 @@ bool Renderer::Update()
         m_pDeviceContext->UpdateSubresource(m_pGeomBuffer, 0, nullptr, &geomBuffer, 0, 0);
 
         // Model matrix for second cube
-        m = DirectX::XMMatrixTranslation(1.0f, 0.0f, 0.0f);
+        m = DirectX::XMMatrixTranslation(2.0f, 0.0f, 0.0f);
         geomBuffer.m = m;
         m_pDeviceContext->UpdateSubresource(m_pGeomBuffer2, 0, nullptr, &geomBuffer, 0, 0);
+
+        // Model matrix for rect
+        m = DirectX::XMMatrixTranslation(1.0f, 0.0f, 0.0f);
+        geomBuffer.m = m;
+        m_pDeviceContext->UpdateSubresource(m_pRectGeomBuffer, 0, nullptr, &geomBuffer, 0, 0);
     }
 
     m_prevUSec = usec;
@@ -352,6 +363,8 @@ bool Renderer::Render()
 
     m_pDeviceContext->RSSetState(m_pRasterizerState);
 
+    m_pDeviceContext->OMSetBlendState(m_pOpaqueBlendState, nullptr, 0xFFFFFFFF);
+
     ID3D11SamplerState* samplers[] = {m_pSampler};
     m_pDeviceContext->PSSetSamplers(0, 1, samplers);
 
@@ -374,6 +387,8 @@ bool Renderer::Render()
     ID3D11Buffer* cbuffers2[] = { m_pGeomBuffer2 };
     m_pDeviceContext->VSSetConstantBuffers(1, 1, cbuffers2);
     m_pDeviceContext->DrawIndexed(36, 0, 0);
+
+    RenderRects();
 
     HRESULT result = m_pSwapChain->Present(0, 0);
     assert(SUCCEEDED(result));
@@ -733,7 +748,7 @@ HRESULT Renderer::InitScene()
         D3D11_RASTERIZER_DESC desc = {};
         desc.AntialiasedLineEnable = FALSE;
         desc.FillMode = D3D11_FILL_SOLID;
-        desc.CullMode = D3D11_CULL_BACK;
+        desc.CullMode = D3D11_CULL_NONE;
         desc.FrontCounterClockwise = FALSE;
         desc.DepthBias = 0;
         desc.SlopeScaledDepthBias = 0.0f;
@@ -747,6 +762,36 @@ HRESULT Renderer::InitScene()
         if (SUCCEEDED(result))
         {
             result = SetResourceName(m_pRasterizerState, "RasterizerState");
+        }
+    }
+
+    // Create blend states
+    if (SUCCEEDED(result))
+    {
+        D3D11_BLEND_DESC desc = {};
+        desc.AlphaToCoverageEnable = FALSE;
+        desc.IndependentBlendEnable = FALSE;
+        desc.RenderTarget[0].BlendEnable = TRUE;
+        desc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+        desc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+        desc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+        desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_RED | D3D11_COLOR_WRITE_ENABLE_GREEN | D3D11_COLOR_WRITE_ENABLE_BLUE;
+        desc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+        desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+        desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+        result = m_pDevice->CreateBlendState(&desc, &m_pTransBlendState);
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pTransBlendState, "TransBlendState");
+        }
+        if (SUCCEEDED(result))
+        {
+            desc.RenderTarget[0].BlendEnable = FALSE;
+            result = m_pDevice->CreateBlendState(&desc, &m_pOpaqueBlendState);
+        }
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pOpaqueBlendState, "OpaqueBlendState");
         }
     }
 
@@ -826,7 +871,6 @@ HRESULT Renderer::InitScene()
         desc.Texture2D.MostDetailedMip = 0;
 
         result = m_pDevice->CreateShaderResourceView(m_pTexture, &desc, &m_pTextureView);
-        assert(SUCCEEDED(result));
     }
     if (SUCCEEDED(result))
     {
@@ -846,19 +890,23 @@ HRESULT Renderer::InitScene()
         desc.BorderColor[0] = desc.BorderColor[1] = desc.BorderColor[2] = desc.BorderColor[3] = 1.0f;
 
         result = m_pDevice->CreateSamplerState(&desc, &m_pSampler);
-        assert(SUCCEEDED(result));
     }
 
     if (SUCCEEDED(result))
     {
         result = InitSphere();
-        assert(SUCCEEDED(result));
     }
     if (SUCCEEDED(result))
     {
         result = InitCubemap();
-        assert(SUCCEEDED(result));
     }
+
+    if (SUCCEEDED(result))
+    {
+        result = InitRect();
+    }
+
+    assert(SUCCEEDED(result));
 
     return result;
 }
@@ -989,6 +1037,126 @@ HRESULT Renderer::InitSphere()
     return result;
 }
 
+HRESULT Renderer::InitRect()
+{
+    static const D3D11_INPUT_ELEMENT_DESC InputDesc[] = {
+        {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
+        {"COLOR", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0}
+    };
+
+    static const ColorVertex Vertices[] =
+    {
+        {0.0, -0.75, -0.75, RGB(128,0,128)},
+        {0.0,  0.75, -0.75, RGB(128,0,128)},
+        {0.0,  0.75,  0.75, RGB(128,0,128)},
+        {0.0, -0.75,  0.75, RGB(128,0,128)}
+    };
+    static const UINT16 Indices[] = {
+        0, 1, 2,
+        0, 2, 3
+    };
+
+    HRESULT result = S_OK;
+
+    // Create vertex buffer
+    if (SUCCEEDED(result))
+    {
+        D3D11_BUFFER_DESC desc = {};
+        desc.ByteWidth = (UINT)sizeof(Vertices);
+        desc.Usage = D3D11_USAGE_IMMUTABLE;
+        desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = 0;
+        desc.StructureByteStride = 0;
+
+        D3D11_SUBRESOURCE_DATA data;
+        data.pSysMem = Vertices;
+        data.SysMemPitch = (UINT)sizeof(Vertices);
+        data.SysMemSlicePitch = 0;
+
+        result = m_pDevice->CreateBuffer(&desc, &data, &m_pRectVertexBuffer);
+        assert(SUCCEEDED(result));
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pRectVertexBuffer, "RectVertexBuffer");
+        }
+    }
+
+    // Create index buffer
+    if (SUCCEEDED(result))
+    {
+        D3D11_BUFFER_DESC desc = {};
+        desc.ByteWidth = (UINT)sizeof(Indices);
+        desc.Usage = D3D11_USAGE_IMMUTABLE;
+        desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = 0;
+        desc.StructureByteStride = 0;
+
+        D3D11_SUBRESOURCE_DATA data;
+        data.pSysMem = Indices;
+        data.SysMemPitch = (UINT)sizeof(Indices);
+        data.SysMemSlicePitch = 0;
+
+        result = m_pDevice->CreateBuffer(&desc, &data, &m_pRectIndexBuffer);
+        assert(SUCCEEDED(result));
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pRectIndexBuffer, "RectIndexBuffer");
+        }
+    }
+
+    ID3DBlob* pRectVertexShaderCode = nullptr;
+    if (SUCCEEDED(result))
+    {
+        result = CompileAndCreateShader(L"TransColor.vs", (ID3D11DeviceChild**)&m_pRectVertexShader, &pRectVertexShaderCode);
+    }
+    if (SUCCEEDED(result))
+    {
+        result = CompileAndCreateShader(L"TransColor.ps", (ID3D11DeviceChild**)&m_pRectPixelShader);
+    }
+
+    if (SUCCEEDED(result))
+    {
+        result = m_pDevice->CreateInputLayout(InputDesc, 2, pRectVertexShaderCode->GetBufferPointer(), pRectVertexShaderCode->GetBufferSize(), &m_pRectInputLayout);
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pRectInputLayout, "RectInputLayout");
+        }
+    }
+
+    SAFE_RELEASE(pRectVertexShaderCode);
+
+    // Create geometry buffer
+    if (SUCCEEDED(result))
+    {
+        D3D11_BUFFER_DESC desc = {};
+        desc.ByteWidth = sizeof(GeomBuffer);
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = 0;
+        desc.StructureByteStride = 0;
+
+        GeomBuffer geomBuffer;
+        geomBuffer.m = DirectX::XMMatrixIdentity();
+
+        D3D11_SUBRESOURCE_DATA data;
+        data.pSysMem = &geomBuffer;
+        data.SysMemPitch = sizeof(geomBuffer);
+        data.SysMemSlicePitch = 0;
+
+        result = m_pDevice->CreateBuffer(&desc, &data, &m_pRectGeomBuffer);
+        assert(SUCCEEDED(result));
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pRectGeomBuffer, "RectGeomBuffer");
+        }
+    }
+
+    return result;
+}
+
 HRESULT Renderer::InitCubemap()
 {
     HRESULT result = S_OK;
@@ -1085,6 +1253,9 @@ void Renderer::TermScene()
     SAFE_RELEASE(m_pGeomBuffer);
     SAFE_RELEASE(m_pGeomBuffer2);
 
+    SAFE_RELEASE(m_pTransBlendState);
+    SAFE_RELEASE(m_pOpaqueBlendState);
+
     // Term sphere
     SAFE_RELEASE(m_pSphereInputLayout);
     SAFE_RELEASE(m_pSpherePixelShader);
@@ -1097,6 +1268,16 @@ void Renderer::TermScene()
 
     SAFE_RELEASE(m_pCubemapTexture);
     SAFE_RELEASE(m_pCubemapView);
+
+    // Term rect
+    SAFE_RELEASE(m_pRectInputLayout);
+    SAFE_RELEASE(m_pRectPixelShader);
+    SAFE_RELEASE(m_pRectVertexShader);
+
+    SAFE_RELEASE(m_pRectIndexBuffer);
+    SAFE_RELEASE(m_pRectVertexBuffer);
+
+    SAFE_RELEASE(m_pRectGeomBuffer);
 
     // Term depth buffer
     SAFE_RELEASE(m_pDepthBuffer);
@@ -1123,6 +1304,24 @@ void Renderer::RenderSphere()
     m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
     m_pDeviceContext->PSSetShader(m_pSpherePixelShader, nullptr, 0);
     m_pDeviceContext->DrawIndexed(m_sphereIndexCount, 0, 0);
+}
+
+void Renderer::RenderRects()
+{
+    m_pDeviceContext->OMSetBlendState(m_pTransBlendState, nullptr, 0xFFFFFFFF);
+
+    m_pDeviceContext->IASetIndexBuffer(m_pRectIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
+    ID3D11Buffer* vertexBuffers[] = { m_pRectVertexBuffer };
+    UINT strides[] = { 16 };
+    UINT offsets[] = { 0 };
+    ID3D11Buffer* cbuffers[] = { m_pSceneBuffer, m_pRectGeomBuffer };
+    m_pDeviceContext->IASetVertexBuffers(0, 1, vertexBuffers, strides, offsets);
+    m_pDeviceContext->IASetInputLayout(m_pRectInputLayout);
+    m_pDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    m_pDeviceContext->VSSetShader(m_pRectVertexShader, nullptr, 0);
+    m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
+    m_pDeviceContext->PSSetShader(m_pRectPixelShader, nullptr, 0);
+    m_pDeviceContext->DrawIndexed(6, 0, 0);
 }
 
 HRESULT Renderer::CompileAndCreateShader(const std::wstring& path, ID3D11DeviceChild** ppShader, ID3DBlob** ppCode)

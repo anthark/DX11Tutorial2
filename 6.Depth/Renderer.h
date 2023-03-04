@@ -28,6 +28,12 @@ public:
         , m_pPixelShader(nullptr)
         , m_pVertexShader(nullptr)
         , m_pInputLayout(nullptr)
+        , m_pRectGeomBuffer(nullptr)
+        , m_pRectVertexBuffer(nullptr)
+        , m_pRectIndexBuffer(nullptr)
+        , m_pRectPixelShader(nullptr)
+        , m_pRectVertexShader(nullptr)
+        , m_pRectInputLayout(nullptr)
         , m_pSphereGeomBuffer(nullptr)
         , m_pSphereVertexBuffer(nullptr)
         , m_pSphereIndexBuffer(nullptr)
@@ -38,6 +44,8 @@ public:
         , m_pCubemapTexture(nullptr)
         , m_pCubemapView(nullptr)
         , m_pRasterizerState(nullptr)
+        , m_pTransBlendState(nullptr)
+        , m_pOpaqueBlendState(nullptr)
         , m_prevUSec(0)
         , m_rbPressed(false)
         , m_prevMouseX(0)
@@ -79,10 +87,12 @@ private:
     HRESULT SetupBackBuffer();
     HRESULT InitScene();
     HRESULT InitSphere();
+    HRESULT InitRect();
     HRESULT InitCubemap();
     void TermScene();
 
     void RenderSphere();
+    void RenderRects();
 
     HRESULT CompileAndCreateShader(const std::wstring& path, ID3D11DeviceChild** ppShader, ID3DBlob** ppCode = nullptr);
 
@@ -118,10 +128,21 @@ private:
     ID3D11InputLayout* m_pSphereInputLayout;
     UINT m_sphereIndexCount;
 
+    // For rect
+    ID3D11Buffer* m_pRectGeomBuffer;
+    ID3D11Buffer* m_pRectVertexBuffer;
+    ID3D11Buffer* m_pRectIndexBuffer;
+    ID3D11PixelShader* m_pRectPixelShader;
+    ID3D11VertexShader* m_pRectVertexShader;
+    ID3D11InputLayout* m_pRectInputLayout;
+
     ID3D11Texture2D* m_pCubemapTexture;
     ID3D11ShaderResourceView* m_pCubemapView;
 
     ID3D11RasterizerState* m_pRasterizerState;
+
+    ID3D11BlendState* m_pTransBlendState;
+    ID3D11BlendState* m_pOpaqueBlendState;
 
     ID3D11Texture2D* m_pTexture;
     ID3D11ShaderResourceView* m_pTextureView;
