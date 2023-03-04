@@ -15,9 +15,12 @@ public:
         , m_pDeviceContext(nullptr)
         , m_pSwapChain(nullptr)
         , m_pBackBufferRTV(nullptr)
+        , m_pDepthBuffer(nullptr)
+        , m_pDepthBufferDSV(nullptr)
         , m_width(16)
         , m_height(16)
         , m_pGeomBuffer(nullptr)
+        , m_pGeomBuffer2(nullptr)
         , m_pSceneBuffer(nullptr)
         , m_pVertexBuffer(nullptr)
         , m_pIndexBuffer(nullptr)
@@ -89,10 +92,14 @@ private:
     IDXGISwapChain* m_pSwapChain;
     ID3D11RenderTargetView* m_pBackBufferRTV;
 
+    ID3D11Texture2D* m_pDepthBuffer;
+    ID3D11DepthStencilView* m_pDepthBufferDSV;
+
     ID3D11Buffer* m_pSceneBuffer;
 
     // For cube
     ID3D11Buffer* m_pGeomBuffer;
+    ID3D11Buffer* m_pGeomBuffer2; // Second cube transform
     ID3D11Buffer* m_pVertexBuffer;
     ID3D11Buffer* m_pIndexBuffer;
     ID3D11PixelShader* m_pPixelShader;

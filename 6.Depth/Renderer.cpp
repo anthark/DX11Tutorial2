@@ -270,6 +270,11 @@ bool Renderer::Update()
         geomBuffer.m = m;
 
         m_pDeviceContext->UpdateSubresource(m_pGeomBuffer, 0, nullptr, &geomBuffer, 0, 0);
+
+        // Model matrix for second cube
+        m = DirectX::XMMatrixTranslation(1.0f, 0.0f, 0.0f);
+        geomBuffer.m = m;
+        m_pDeviceContext->UpdateSubresource(m_pGeomBuffer2, 0, nullptr, &geomBuffer, 0, 0);
     }
 
     m_prevUSec = usec;
@@ -319,10 +324,11 @@ bool Renderer::Render()
     m_pDeviceContext->ClearState();
 
     ID3D11RenderTargetView* views[] = { m_pBackBufferRTV };
-    m_pDeviceContext->OMSetRenderTargets(1, views, nullptr);
+    m_pDeviceContext->OMSetRenderTargets(1, views, m_pDepthBufferDSV);
 
     static const FLOAT BackColor[4] = { 0.25f, 0.25f, 0.25f, 1.0f };
     m_pDeviceContext->ClearRenderTargetView(m_pBackBufferRTV, BackColor);
+    m_pDeviceContext->ClearDepthStencilView(m_pDepthBufferDSV, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
     D3D11_VIEWPORT viewport;
     viewport.TopLeftX = 0;
@@ -363,6 +369,10 @@ bool Renderer::Render()
     m_pDeviceContext->PSSetShader(m_pPixelShader, nullptr, 0);
     m_pDeviceContext->DrawIndexed(36, 0, 0);
 
+    ID3D11Buffer* cbuffers2[] = { m_pGeomBuffer2 };
+    m_pDeviceContext->VSSetConstantBuffers(1, 1, cbuffers2);
+    m_pDeviceContext->DrawIndexed(36, 0, 0);
+
     HRESULT result = m_pSwapChain->Present(0, 0);
     assert(SUCCEEDED(result));
 
@@ -374,6 +384,8 @@ bool Renderer::Resize(UINT width, UINT height)
     if (width != m_width || height != m_height)
     {
         SAFE_RELEASE(m_pBackBufferRTV);
+        SAFE_RELEASE(m_pDepthBuffer);
+        SAFE_RELEASE(m_pDepthBufferDSV);
 
         HRESULT result = m_pSwapChain->ResizeBuffers(2, width, height, DXGI_FORMAT_R8G8B8A8_UNORM, 0);
         assert(SUCCEEDED(result));
@@ -499,14 +511,43 @@ HRESULT Renderer::SetupBackBuffer()
 {
     ID3D11Texture2D* pBackBuffer = NULL;
     HRESULT result = m_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&pBackBuffer);
-    assert(SUCCEEDED(result));
     if (SUCCEEDED(result))
     {
         result = m_pDevice->CreateRenderTargetView(pBackBuffer, NULL, &m_pBackBufferRTV);
-        assert(SUCCEEDED(result));
 
         SAFE_RELEASE(pBackBuffer);
     }
+    if (SUCCEEDED(result))
+    {
+        D3D11_TEXTURE2D_DESC desc;
+        desc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+        desc.ArraySize = 1;
+        desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = 0;
+        desc.SampleDesc.Count = 1;
+        desc.SampleDesc.Quality = 0;
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.Height = m_height;
+        desc.Width = m_width;
+        desc.MipLevels = 1;
+
+        result = m_pDevice->CreateTexture2D(&desc, nullptr, &m_pDepthBuffer);
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pDepthBuffer, "DepthBuffer");
+        }
+    }
+    if (SUCCEEDED(result))
+    {
+        result = m_pDevice->CreateDepthStencilView(m_pDepthBuffer, nullptr, &m_pDepthBufferDSV);
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pDepthBuffer, "DepthBufferView");
+        }
+    }
+
+    assert(SUCCEEDED(result));
 
     return result;
 }
@@ -654,6 +695,15 @@ HRESULT Renderer::InitScene()
         if (SUCCEEDED(result))
         {
             result = SetResourceName(m_pGeomBuffer, "GeomBuffer");
+        }
+        if (SUCCEEDED(result))
+        {
+            result = m_pDevice->CreateBuffer(&desc, &data, &m_pGeomBuffer2);
+            assert(SUCCEEDED(result));
+            if (SUCCEEDED(result))
+            {
+                result = SetResourceName(m_pGeomBuffer2, "GeomBuffer2");
+            }
         }
     }
     // Create scene buffer
@@ -1014,6 +1064,7 @@ void Renderer::TermScene()
 
     SAFE_RELEASE(m_pSceneBuffer);
     SAFE_RELEASE(m_pGeomBuffer);
+    SAFE_RELEASE(m_pGeomBuffer2);
 
     // Term sphere
     SAFE_RELEASE(m_pSphereInputLayout);
@@ -1027,6 +1078,10 @@ void Renderer::TermScene()
 
     SAFE_RELEASE(m_pCubemapTexture);
     SAFE_RELEASE(m_pCubemapView);
+
+    // Term depth buffer
+    SAFE_RELEASE(m_pDepthBuffer);
+    SAFE_RELEASE(m_pDepthBufferDSV);
 }
 
 void Renderer::RenderSphere()
