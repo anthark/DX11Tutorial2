@@ -35,6 +35,13 @@ struct SphereGeomBuffer
     Point4f size;
 };
 
+struct RectGeomBuffer
+{
+    DirectX::XMMATRIX m;
+    Point4f color;
+};
+
+
 struct SceneBuffer
 {
     DirectX::XMMATRIX vp;
@@ -283,9 +290,20 @@ bool Renderer::Update()
         m_pDeviceContext->UpdateSubresource(m_pGeomBuffer2, 0, nullptr, &geomBuffer, 0, 0);
 
         // Model matrix for rect
-        m = DirectX::XMMatrixTranslation(1.0f, 0.0f, 0.0f);
-        geomBuffer.m = m;
-        m_pDeviceContext->UpdateSubresource(m_pRectGeomBuffer, 0, nullptr, &geomBuffer, 0, 0);
+        {
+            RectGeomBuffer rectGeomBuffer;
+
+            m = DirectX::XMMatrixTranslation(1.0f, 0.0f, 0.0f);
+            rectGeomBuffer.m = m;
+            rectGeomBuffer.color = Point4f{0.5f, 0, 0.5f, 1.0f};
+            m_pDeviceContext->UpdateSubresource(m_pRectGeomBuffer, 0, nullptr, &rectGeomBuffer, 0, 0);
+
+            // Model matrix for second rect
+            m = DirectX::XMMatrixTranslation(1.2f, 0.0f, 0.0f);
+            rectGeomBuffer.m = m;
+            rectGeomBuffer.color = Point4f{ 0.5f, 0.5f, 0, 1.0f };
+            m_pDeviceContext->UpdateSubresource(m_pRectGeomBuffer2, 0, nullptr, &rectGeomBuffer, 0, 0);
+        }
     }
 
     m_prevUSec = usec;
@@ -811,6 +829,22 @@ HRESULT Renderer::InitScene()
         }
     }
 
+    // Create reverse transparent depth state
+    if (SUCCEEDED(result))
+    {
+        D3D11_DEPTH_STENCIL_DESC desc = {};
+        desc.DepthEnable = TRUE;
+        desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+        desc.DepthFunc = D3D11_COMPARISON_GREATER;
+        desc.StencilEnable = FALSE;
+
+        result = m_pDevice->CreateDepthStencilState(&desc, &m_pTransDepthState);
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pTransDepthState, "TransDepthState");
+        }
+    }
+
     // Load texture
     DXGI_FORMAT textureFmt;
     if (SUCCEEDED(result))
@@ -1131,15 +1165,16 @@ HRESULT Renderer::InitRect()
     if (SUCCEEDED(result))
     {
         D3D11_BUFFER_DESC desc = {};
-        desc.ByteWidth = sizeof(GeomBuffer);
+        desc.ByteWidth = sizeof(RectGeomBuffer);
         desc.Usage = D3D11_USAGE_DEFAULT;
         desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
         desc.CPUAccessFlags = 0;
         desc.MiscFlags = 0;
         desc.StructureByteStride = 0;
 
-        GeomBuffer geomBuffer;
+        RectGeomBuffer geomBuffer;
         geomBuffer.m = DirectX::XMMatrixIdentity();
+        geomBuffer.color = Point4f{ 1,1,1,1 };
 
         D3D11_SUBRESOURCE_DATA data;
         data.pSysMem = &geomBuffer;
@@ -1151,6 +1186,14 @@ HRESULT Renderer::InitRect()
         if (SUCCEEDED(result))
         {
             result = SetResourceName(m_pRectGeomBuffer, "RectGeomBuffer");
+        }
+        if (SUCCEEDED(result))
+        {
+            result = m_pDevice->CreateBuffer(&desc, &data, &m_pRectGeomBuffer2);
+        }
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pRectGeomBuffer2, "RectGeomBuffer2");
         }
     }
 
@@ -1241,6 +1284,7 @@ void Renderer::TermScene()
 
     SAFE_RELEASE(m_pRasterizerState);
     SAFE_RELEASE(m_pDepthState);
+    SAFE_RELEASE(m_pTransDepthState);
 
     SAFE_RELEASE(m_pInputLayout);
     SAFE_RELEASE(m_pPixelShader);
@@ -1278,6 +1322,7 @@ void Renderer::TermScene()
     SAFE_RELEASE(m_pRectVertexBuffer);
 
     SAFE_RELEASE(m_pRectGeomBuffer);
+    SAFE_RELEASE(m_pRectGeomBuffer2);
 
     // Term depth buffer
     SAFE_RELEASE(m_pDepthBuffer);
@@ -1308,20 +1353,51 @@ void Renderer::RenderSphere()
 
 void Renderer::RenderRects()
 {
+    m_pDeviceContext->OMSetDepthStencilState(m_pTransDepthState, 0);
+
     m_pDeviceContext->OMSetBlendState(m_pTransBlendState, nullptr, 0xFFFFFFFF);
 
     m_pDeviceContext->IASetIndexBuffer(m_pRectIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
     ID3D11Buffer* vertexBuffers[] = { m_pRectVertexBuffer };
     UINT strides[] = { 16 };
     UINT offsets[] = { 0 };
-    ID3D11Buffer* cbuffers[] = { m_pSceneBuffer, m_pRectGeomBuffer };
+    ID3D11Buffer* cbuffers[] = { m_pSceneBuffer, nullptr };
     m_pDeviceContext->IASetVertexBuffers(0, 1, vertexBuffers, strides, offsets);
     m_pDeviceContext->IASetInputLayout(m_pRectInputLayout);
     m_pDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     m_pDeviceContext->VSSetShader(m_pRectVertexShader, nullptr, 0);
     m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
+    m_pDeviceContext->PSSetConstantBuffers(0, 2, cbuffers);
     m_pDeviceContext->PSSetShader(m_pRectPixelShader, nullptr, 0);
     m_pDeviceContext->DrawIndexed(6, 0, 0);
+
+    Point3f dir, right;
+    m_camera.GetDirections(dir, right);
+
+    if (dir.x < 0.0)
+    {
+        cbuffers[1] = m_pRectGeomBuffer;
+        m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
+        m_pDeviceContext->PSSetConstantBuffers(0, 2, cbuffers);
+        m_pDeviceContext->DrawIndexed(6, 0, 0);
+
+        cbuffers[1] = m_pRectGeomBuffer2;
+        m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
+        m_pDeviceContext->PSSetConstantBuffers(0, 2, cbuffers);
+        m_pDeviceContext->DrawIndexed(6, 0, 0);
+    }
+    else
+    {
+        cbuffers[1] = m_pRectGeomBuffer2;
+        m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
+        m_pDeviceContext->PSSetConstantBuffers(0, 2, cbuffers);
+        m_pDeviceContext->DrawIndexed(6, 0, 0);
+
+        cbuffers[1] = m_pRectGeomBuffer;
+        m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
+        m_pDeviceContext->PSSetConstantBuffers(0, 2, cbuffers);
+        m_pDeviceContext->DrawIndexed(6, 0, 0);
+    }
 }
 
 HRESULT Renderer::CompileAndCreateShader(const std::wstring& path, ID3D11DeviceChild** ppShader, ID3DBlob** ppCode)

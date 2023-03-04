@@ -18,6 +18,7 @@ public:
         , m_pDepthBuffer(nullptr)
         , m_pDepthBufferDSV(nullptr)
         , m_pDepthState(nullptr)
+        , m_pTransDepthState(nullptr)
         , m_width(16)
         , m_height(16)
         , m_pGeomBuffer(nullptr)
@@ -29,6 +30,7 @@ public:
         , m_pVertexShader(nullptr)
         , m_pInputLayout(nullptr)
         , m_pRectGeomBuffer(nullptr)
+        , m_pRectGeomBuffer2(nullptr)
         , m_pRectVertexBuffer(nullptr)
         , m_pRectIndexBuffer(nullptr)
         , m_pRectPixelShader(nullptr)
@@ -107,6 +109,7 @@ private:
     ID3D11DepthStencilView* m_pDepthBufferDSV;
 
     ID3D11DepthStencilState* m_pDepthState;
+    ID3D11DepthStencilState* m_pTransDepthState;
 
     ID3D11Buffer* m_pSceneBuffer;
 
@@ -130,6 +133,7 @@ private:
 
     // For rect
     ID3D11Buffer* m_pRectGeomBuffer;
+    ID3D11Buffer* m_pRectGeomBuffer2;
     ID3D11Buffer* m_pRectVertexBuffer;
     ID3D11Buffer* m_pRectIndexBuffer;
     ID3D11PixelShader* m_pRectPixelShader;
