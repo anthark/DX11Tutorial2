@@ -301,7 +301,7 @@ bool Renderer::Update()
     float fov = (float)M_PI / 3;
     float c = 1.0f / tanf(fov / 2);
     float aspectRatio = (float)m_height / m_width;
-    DirectX::XMMATRIX p = DirectX::XMMatrixPerspectiveLH(tanf(fov / 2) * 2 * n, tanf(fov / 2) * 2 * n * aspectRatio, n, f);
+    DirectX::XMMATRIX p = DirectX::XMMatrixPerspectiveLH(tanf(fov / 2) * 2 * f, tanf(fov / 2) * 2 * f * aspectRatio, f, n);
 
     D3D11_MAPPED_SUBRESOURCE subresource;
     HRESULT result = m_pDeviceContext->Map(m_pSceneBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &subresource);
@@ -328,7 +328,7 @@ bool Renderer::Render()
 
     static const FLOAT BackColor[4] = { 0.25f, 0.25f, 0.25f, 1.0f };
     m_pDeviceContext->ClearRenderTargetView(m_pBackBufferRTV, BackColor);
-    m_pDeviceContext->ClearDepthStencilView(m_pDepthBufferDSV, D3D11_CLEAR_DEPTH, 1.0f, 0);
+    m_pDeviceContext->ClearDepthStencilView(m_pDepthBufferDSV, D3D11_CLEAR_DEPTH, 0.0f, 0);
 
     D3D11_VIEWPORT viewport;
     viewport.TopLeftX = 0;
@@ -345,6 +345,8 @@ bool Renderer::Render()
     rect.right = m_width;
     rect.bottom = m_height;
     m_pDeviceContext->RSSetScissorRects(1, &rect);
+
+    m_pDeviceContext->OMSetDepthStencilState(m_pDepthState, 0);
 
     //RenderSphere();
 
@@ -520,7 +522,7 @@ HRESULT Renderer::SetupBackBuffer()
     if (SUCCEEDED(result))
     {
         D3D11_TEXTURE2D_DESC desc;
-        desc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+        desc.Format = DXGI_FORMAT_D32_FLOAT;
         desc.ArraySize = 1;
         desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
         desc.CPUAccessFlags = 0;
@@ -745,6 +747,22 @@ HRESULT Renderer::InitScene()
         if (SUCCEEDED(result))
         {
             result = SetResourceName(m_pRasterizerState, "RasterizerState");
+        }
+    }
+
+    // Create reverse depth state
+    if (SUCCEEDED(result))
+    {
+        D3D11_DEPTH_STENCIL_DESC desc = {};
+        desc.DepthEnable = TRUE;
+        desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+        desc.DepthFunc = D3D11_COMPARISON_GREATER;
+        desc.StencilEnable = FALSE;
+
+        result = m_pDevice->CreateDepthStencilState(&desc, &m_pDepthState);
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pDepthState, "DepthState");
         }
     }
 
@@ -1054,6 +1072,7 @@ void Renderer::TermScene()
     SAFE_RELEASE(m_pTexture);
 
     SAFE_RELEASE(m_pRasterizerState);
+    SAFE_RELEASE(m_pDepthState);
 
     SAFE_RELEASE(m_pInputLayout);
     SAFE_RELEASE(m_pPixelShader);

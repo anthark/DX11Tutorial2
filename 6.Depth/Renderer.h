@@ -17,6 +17,7 @@ public:
         , m_pBackBufferRTV(nullptr)
         , m_pDepthBuffer(nullptr)
         , m_pDepthBufferDSV(nullptr)
+        , m_pDepthState(nullptr)
         , m_width(16)
         , m_height(16)
         , m_pGeomBuffer(nullptr)
@@ -94,6 +95,8 @@ private:
 
     ID3D11Texture2D* m_pDepthBuffer;
     ID3D11DepthStencilView* m_pDepthBufferDSV;
+
+    ID3D11DepthStencilState* m_pDepthState;
 
     ID3D11Buffer* m_pSceneBuffer;
 
