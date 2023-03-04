@@ -340,7 +340,7 @@ bool Renderer::Render()
     rect.bottom = m_height;
     m_pDeviceContext->RSSetScissorRects(1, &rect);
 
-    RenderSphere();
+    //RenderSphere();
 
     m_pDeviceContext->RSSetState(m_pRasterizerState);
 
