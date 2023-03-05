@@ -12,10 +12,11 @@
 
 #include "../Math/Matrix.h"
 
-struct TextureVertex
+struct TextureNormalVertex
 {
-    float x, y, z;
-    float u, v;
+    Point3f pos;
+    Point3f norm;
+    Point2f uv;
 };
 
 struct ColorVertex
@@ -42,10 +43,18 @@ struct RectGeomBuffer
 };
 
 
+struct Light
+{
+    float4 pos;
+    float4 color;
+};
+
 struct SceneBuffer
 {
     DirectX::XMMATRIX vp;
     Point4f cameraPos;
+    Point4i lightCount; // x - light count (max 10)
+    Light lights[10];
 };
 
 static const float CameraRotationSpeed = (float)M_PI * 2.0f;
@@ -341,6 +350,9 @@ bool Renderer::Update()
 
         sceneBuffer.vp = DirectX::XMMatrixMultiply(v, p);
         sceneBuffer.cameraPos = cameraPos;
+        sceneBuffer.lightCount = 1;
+        sceneBuffer.lights[0].pos = Point4f{0.0f, 1.5f, 0.0f, 1.0f};
+        sceneBuffer.lights[0].color = Point4f{ 1.0f, 1.0f, 0.0f, 1.0f };
 
         m_pDeviceContext->Unmap(m_pSceneBuffer, 0);
     }
@@ -389,7 +401,7 @@ bool Renderer::Render()
 
     m_pDeviceContext->IASetIndexBuffer(m_pIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
     ID3D11Buffer* vertexBuffers[] = {m_pVertexBuffer};
-    UINT strides[] = {20};
+    UINT strides[] = {32};
     UINT offsets[] = {0};
     ID3D11Buffer* cbuffers[] = {m_pSceneBuffer, m_pGeomBuffer};
     m_pDeviceContext->IASetVertexBuffers(0, 1, vertexBuffers, strides, offsets);
@@ -397,11 +409,13 @@ bool Renderer::Render()
     m_pDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     m_pDeviceContext->VSSetShader(m_pVertexShader, nullptr, 0);
     m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
+    m_pDeviceContext->PSSetConstantBuffers(0, 2, cbuffers);
     m_pDeviceContext->PSSetShader(m_pPixelShader, nullptr, 0);
     m_pDeviceContext->DrawIndexed(36, 0, 0);
 
     ID3D11Buffer* cbuffers2[] = { m_pGeomBuffer2 };
     m_pDeviceContext->VSSetConstantBuffers(1, 1, cbuffers2);
+    m_pDeviceContext->PSSetConstantBuffers(1, 1, cbuffers2);
     m_pDeviceContext->DrawIndexed(36, 0, 0);
 
     //RenderSphere();
@@ -590,37 +604,37 @@ HRESULT Renderer::SetupBackBuffer()
 HRESULT Renderer::InitScene()
 {
     // Textured cube
-    static const TextureVertex Vertices[24] = {
+    static const TextureNormalVertex Vertices[24] = {
         // Bottom face
-        {-0.5, -0.5,  0.5, 0, 1},
-        { 0.5, -0.5,  0.5, 1, 1},
-        { 0.5, -0.5, -0.5, 1, 0},
-        {-0.5, -0.5, -0.5, 0, 0},
+        {Point3f{-0.5, -0.5,  0.5}, Point3f{0, -1, 0}, Point2f{0, 1}},
+        {Point3f{ 0.5, -0.5,  0.5}, Point3f{0, -1, 0}, Point2f{1, 1}},
+        {Point3f{ 0.5, -0.5, -0.5}, Point3f{0, -1, 0}, Point2f{1, 0}},
+        {Point3f{-0.5, -0.5, -0.5}, Point3f{0, -1, 0}, Point2f{0, 0}},
         // Top face
-        {-0.5,  0.5, -0.5, 0, 1},
-        { 0.5,  0.5, -0.5, 1, 1},
-        { 0.5,  0.5,  0.5, 1, 0},
-        {-0.5,  0.5,  0.5, 0, 0},
+        {Point3f{-0.5,  0.5, -0.5}, Point3f{0, 1, 0}, Point2f{0, 1}},
+        {Point3f{ 0.5,  0.5, -0.5}, Point3f{0, 1, 0}, Point2f{1, 1}},
+        {Point3f{ 0.5,  0.5,  0.5}, Point3f{0, 1, 0}, Point2f{1, 0}},
+        {Point3f{-0.5,  0.5,  0.5}, Point3f{0, 1, 0}, Point2f{0, 0}},
         // Front face
-        { 0.5, -0.5, -0.5, 0, 1},
-        { 0.5, -0.5,  0.5, 1, 1},
-        { 0.5,  0.5,  0.5, 1, 0},
-        { 0.5,  0.5, -0.5, 0, 0},
+        {Point3f{ 0.5, -0.5, -0.5}, Point3f{1, 0, 0}, Point2f{0, 1}},
+        {Point3f{ 0.5, -0.5,  0.5}, Point3f{1, 0, 0}, Point2f{1, 1}},
+        {Point3f{ 0.5,  0.5,  0.5}, Point3f{1, 0, 0}, Point2f{1, 0}},
+        {Point3f{ 0.5,  0.5, -0.5}, Point3f{1, 0, 0}, Point2f{0, 0}},
         // Back face
-        {-0.5, -0.5,  0.5, 0, 1},
-        {-0.5, -0.5, -0.5, 1, 1},
-        {-0.5,  0.5, -0.5, 1, 0},
-        {-0.5,  0.5,  0.5, 0, 0},
+        {Point3f{-0.5, -0.5,  0.5}, Point3f{-1, 0, 0}, Point2f{0, 1}},
+        {Point3f{-0.5, -0.5, -0.5}, Point3f{-1, 0, 0}, Point2f{1, 1}},
+        {Point3f{-0.5,  0.5, -0.5}, Point3f{-1, 0, 0}, Point2f{1, 0}},
+        {Point3f{-0.5,  0.5,  0.5}, Point3f{-1, 0, 0}, Point2f{0, 0}},
         // Left face
-        { 0.5, -0.5,  0.5, 0, 1},
-        {-0.5, -0.5,  0.5, 1, 1},
-        {-0.5,  0.5,  0.5, 1, 0},
-        { 0.5,  0.5,  0.5, 0, 0},
+        {Point3f{ 0.5, -0.5,  0.5}, Point3f{0, 0, 1}, Point2f{0, 1}},
+        {Point3f{-0.5, -0.5,  0.5}, Point3f{0, 0, 1}, Point2f{1, 1}},
+        {Point3f{-0.5,  0.5,  0.5}, Point3f{0, 0, 1}, Point2f{1, 0}},
+        {Point3f{ 0.5,  0.5,  0.5}, Point3f{0, 0, 1}, Point2f{0, 0}},
         // Right face
-        {-0.5, -0.5, -0.5, 0, 1},
-        { 0.5, -0.5, -0.5, 1, 1},
-        { 0.5,  0.5, -0.5, 1, 0},
-        {-0.5,  0.5, -0.5, 0, 0}
+        {Point3f{-0.5, -0.5, -0.5}, Point3f{0, 0, -1}, Point2f{0, 1}},
+        {Point3f{ 0.5, -0.5, -0.5}, Point3f{0, 0, -1}, Point2f{1, 1}},
+        {Point3f{ 0.5,  0.5, -0.5}, Point3f{0, 0, -1}, Point2f{1, 0}},
+        {Point3f{-0.5,  0.5, -0.5}, Point3f{0, 0, -1}, Point2f{0, 0}}
     };
     static const UINT16 Indices[36] = {
         0, 2, 1, 0, 3, 2,
@@ -632,7 +646,8 @@ HRESULT Renderer::InitScene()
     };
     static const D3D11_INPUT_ELEMENT_DESC InputDesc[] = {
         {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
-        {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0}
+        {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
+        {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0}
     };
 
     HRESULT result = S_OK;
@@ -697,7 +712,7 @@ HRESULT Renderer::InitScene()
 
     if (SUCCEEDED(result))
     {
-        result = m_pDevice->CreateInputLayout(InputDesc, 2, pVertexShaderCode->GetBufferPointer(), pVertexShaderCode->GetBufferSize(), &m_pInputLayout);
+        result = m_pDevice->CreateInputLayout(InputDesc, 3, pVertexShaderCode->GetBufferPointer(), pVertexShaderCode->GetBufferSize(), &m_pInputLayout);
         if (SUCCEEDED(result))
         {
             result = SetResourceName(m_pInputLayout, "InputLayout");
@@ -849,7 +864,7 @@ HRESULT Renderer::InitScene()
     DXGI_FORMAT textureFmt;
     if (SUCCEEDED(result))
     {
-        const std::wstring TextureName = L"../Common/Kitty.dds";
+        const std::wstring TextureName = L"../Common/Brick.dds";
 
         TextureDesc textureDesc;
         bool ddsRes = LoadDDS(TextureName.c_str(), textureDesc);
@@ -1399,6 +1414,51 @@ void Renderer::RenderRects()
     }
 }
 
+class D3DInclude : public ID3DInclude
+{
+    STDMETHOD(Open)(THIS_ D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID* ppData, UINT* pBytes)
+    {
+        FILE* pFile = nullptr;
+        fopen_s(&pFile, pFileName, "rb");
+        assert(pFile != nullptr);
+        if (pFile == nullptr)
+        {
+            return E_FAIL;
+        }
+
+        fseek(pFile, 0, SEEK_END);
+        long long size = _ftelli64(pFile);
+        fseek(pFile, 0, SEEK_SET);
+
+        VOID* pData = malloc(size);
+        if (pData == nullptr)
+        {
+            fclose(pFile);
+            return E_FAIL;
+        }
+
+        size_t rd = fread(pData, 1, size, pFile);
+        assert(rd == (size_t)size);
+
+        if (rd != (size_t)size)
+        {
+            fclose(pFile);
+            free(pData);
+            return E_FAIL;
+        }
+
+        *ppData = pData;
+        *pBytes = (UINT)size;
+
+        return S_OK;
+    }
+    STDMETHOD(Close)(THIS_ LPCVOID pData)
+    {
+        free(const_cast<void*>(pData));
+        return S_OK;
+    }
+};
+
 HRESULT Renderer::CompileAndCreateShader(const std::wstring& path, ID3D11DeviceChild** ppShader, ID3DBlob** ppCode)
 {
     // Try to load shader's source code first
@@ -1445,10 +1505,12 @@ HRESULT Renderer::CompileAndCreateShader(const std::wstring& path, ID3D11DeviceC
     flags1 |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
 #endif // _DEBUG
 
+    D3DInclude includeHandler;
+
     // Try to compile
     ID3DBlob* pCode = nullptr;
     ID3DBlob* pErrMsg = nullptr;
-    HRESULT result = D3DCompile(data.data(), data.size(), WCSToMBS(path).c_str(), nullptr, nullptr, entryPoint.c_str(), platform.c_str(), flags1, 0, &pCode, &pErrMsg);
+    HRESULT result = D3DCompile(data.data(), data.size(), WCSToMBS(path).c_str(), nullptr, &includeHandler, entryPoint.c_str(), platform.c_str(), flags1, 0, &pCode, &pErrMsg);
     if (!SUCCEEDED(result) && pErrMsg != nullptr)
     {
         OutputDebugStringA((const char*)pErrMsg->GetBufferPointer());

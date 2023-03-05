@@ -1,3 +1,5 @@
+#include "SceneCB.h"
+
 Texture2D colorTexture : register (t0);
 
 SamplerState colorSampler : register(s0);
@@ -5,10 +7,20 @@ SamplerState colorSampler : register(s0);
 struct VSOutput
 {
     float4 pos : SV_Position;
+    float4 worldPos : POSITION;
+    float3 norm : NORMAL;
     float2 uv : TEXCOORD;
 };
 
 float4 ps(VSOutput pixel) : SV_Target0
 {
-    return float4(colorTexture.Sample(colorSampler, pixel.uv).xyz, 1.0);
+    float3 color = colorTexture.Sample(colorSampler, pixel.uv).xyz;
+    float3 lightDir = lights[0].pos.xyz - pixel.worldPos.xyz;
+    float lightDist = length(lightDir);
+    lightDir /= lightDist;
+
+    float atten = clamp(dot(lightDir, pixel.norm) / (lightDist * lightDist), 0, 1);
+
+    return float4(color * atten * lights[0].color.xyz, 1.0);
+    //return float4(pixel.norm * 0.5 + float3(0.5, 0.5, 0.5), 1.0);
 }
