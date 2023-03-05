@@ -1,0 +1,15 @@
+TextureCube colorTexture : register (t0);
+
+SamplerState colorSampler : register(s0);
+
+struct VSOutput
+{
+    float4 pos : SV_Position;
+    float3 localPos : POSITION1;
+};
+
+float4 ps(VSOutput pixel) : SV_Target0
+{
+    return float4(colorTexture.Sample(colorSampler, pixel.localPos).xyz, 1.0);
+    //return float4(pixel.localPos, 1.0) + float4(0.5, 0.5, 0.5, 0.0);
+}
