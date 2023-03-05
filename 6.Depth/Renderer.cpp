@@ -377,8 +377,6 @@ bool Renderer::Render()
 
     m_pDeviceContext->OMSetDepthStencilState(m_pDepthState, 0);
 
-    //RenderSphere();
-
     m_pDeviceContext->RSSetState(m_pRasterizerState);
 
     m_pDeviceContext->OMSetBlendState(m_pOpaqueBlendState, nullptr, 0xFFFFFFFF);
@@ -405,6 +403,8 @@ bool Renderer::Render()
     ID3D11Buffer* cbuffers2[] = { m_pGeomBuffer2 };
     m_pDeviceContext->VSSetConstantBuffers(1, 1, cbuffers2);
     m_pDeviceContext->DrawIndexed(36, 0, 0);
+
+    RenderSphere();
 
     RenderRects();
 
@@ -819,7 +819,7 @@ HRESULT Renderer::InitScene()
         D3D11_DEPTH_STENCIL_DESC desc = {};
         desc.DepthEnable = TRUE;
         desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-        desc.DepthFunc = D3D11_COMPARISON_GREATER;
+        desc.DepthFunc = D3D11_COMPARISON_GREATER_EQUAL;
         desc.StencilEnable = FALSE;
 
         result = m_pDevice->CreateDepthStencilState(&desc, &m_pDepthState);
@@ -1369,7 +1369,6 @@ void Renderer::RenderRects()
     m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
     m_pDeviceContext->PSSetConstantBuffers(0, 2, cbuffers);
     m_pDeviceContext->PSSetShader(m_pRectPixelShader, nullptr, 0);
-    m_pDeviceContext->DrawIndexed(6, 0, 0);
 
     Point3f dir, right;
     m_camera.GetDirections(dir, right);
