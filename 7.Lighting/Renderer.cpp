@@ -12,6 +12,10 @@
 
 #include "../Math/Matrix.h"
 
+#include "imgui.h"
+#include "backends/imgui_impl_dx11.h"
+#include "backends/imgui_impl_win32.h"
+
 struct TextureNormalVertex
 {
     Point3f pos;
@@ -40,21 +44,6 @@ struct RectGeomBuffer
 {
     DirectX::XMMATRIX m;
     Point4f color;
-};
-
-
-struct Light
-{
-    float4 pos;
-    float4 color;
-};
-
-struct SceneBuffer
-{
-    DirectX::XMMATRIX vp;
-    Point4f cameraPos;
-    Point4i lightCount; // x - light count (max 10)
-    Light lights[10];
 };
 
 static const float CameraRotationSpeed = (float)M_PI * 2.0f;
@@ -223,6 +212,28 @@ bool Renderer::Init(HWND hWnd)
     SAFE_RELEASE(pSelectedAdapter);
     SAFE_RELEASE(pFactory);
 
+    if (SUCCEEDED(result))
+    {
+        // Setup Dear ImGui context
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGuiIO& io = ImGui::GetIO(); (void)io;
+        //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+        //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+        // Setup Dear ImGui style
+        ImGui::StyleColorsDark();
+        //ImGui::StyleColorsLight();
+
+        // Setup Platform/Renderer backends
+        ImGui_ImplWin32_Init(hWnd);
+        ImGui_ImplDX11_Init(m_pDevice, m_pDeviceContext);
+
+        m_sceneBuffer.lightCount.x = 1;
+        m_sceneBuffer.lights[0].pos = Point4f{0, 1.05f, 0, 1};
+        m_sceneBuffer.lights[0].color = Point4f{1,1,0};
+    }
+
     if (FAILED(result))
     {
         Term();
@@ -233,6 +244,10 @@ bool Renderer::Init(HWND hWnd)
 
 void Renderer::Term()
 {
+    ImGui_ImplDX11_Shutdown();
+    ImGui_ImplWin32_Shutdown();
+    ImGui::DestroyContext();
+
     TermScene();
 
     SAFE_RELEASE(m_pBackBufferRTV);
@@ -346,13 +361,10 @@ bool Renderer::Update()
     assert(SUCCEEDED(result));
     if (SUCCEEDED(result))
     {
-        SceneBuffer& sceneBuffer = *reinterpret_cast<SceneBuffer*>(subresource.pData);
+        m_sceneBuffer.vp = DirectX::XMMatrixMultiply(v, p);
+        m_sceneBuffer.cameraPos = cameraPos;
 
-        sceneBuffer.vp = DirectX::XMMatrixMultiply(v, p);
-        sceneBuffer.cameraPos = cameraPos;
-        sceneBuffer.lightCount = 1;
-        sceneBuffer.lights[0].pos = Point4f{0.0f, 1.5f, 0.0f, 1.0f};
-        sceneBuffer.lights[0].color = Point4f{ 1.0f, 1.0f, 0.0f, 1.0f };
+        memcpy(subresource.pData, &m_sceneBuffer, sizeof(SceneBuffer));
 
         m_pDeviceContext->Unmap(m_pSceneBuffer, 0);
     }
@@ -421,6 +433,45 @@ bool Renderer::Render()
     //RenderSphere();
 
     //RenderRects();
+
+    // Start the Dear ImGui frame
+    ImGui_ImplDX11_NewFrame();
+    ImGui_ImplWin32_NewFrame();
+    ImGui::NewFrame();
+
+    {
+        ImGui::Begin("Lights");
+
+        bool add = ImGui::Button("+");
+        ImGui::SameLine();
+        bool remove = ImGui::Button("-");
+
+        if (add && m_sceneBuffer.lightCount.x < 10)
+        {
+            ++m_sceneBuffer.lightCount.x;
+            m_sceneBuffer.lights[m_sceneBuffer.lightCount.x - 1] = Light();
+        }
+        if (remove && m_sceneBuffer.lightCount.x > 0)
+        {
+            --m_sceneBuffer.lightCount.x;
+        }
+
+        char buffer[1024];
+        for (int i = 0; i < m_sceneBuffer.lightCount.x; i++)
+        {
+            ImGui::Text("Light %d", i);
+            sprintf_s(buffer, "Pos %d", i);
+            ImGui::DragFloat3(buffer, (float*)&m_sceneBuffer.lights[i].pos, 0.1f, -10.0f, 10.0f);
+            sprintf_s(buffer, "Color %d", i);
+            ImGui::ColorEdit3(buffer, (float*)&m_sceneBuffer.lights[i].color);
+        }
+
+        ImGui::End();
+    }
+
+    // Rendering
+    ImGui::Render();
+    ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
     HRESULT result = m_pSwapChain->Present(0, 0);
     assert(SUCCEEDED(result));

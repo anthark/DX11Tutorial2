@@ -85,6 +85,20 @@ private:
         void GetDirections(Point3f& forward, Point3f& right);
     };
 
+    struct Light
+    {
+        Point4f pos = Point4f{ 0,0,0,0 };
+        Point4f color = Point4f{ 1,1,1,0 };
+    };
+
+    struct SceneBuffer
+    {
+        DirectX::XMMATRIX vp;
+        Point4f cameraPos;
+        Point4i lightCount; // x - light count (max 10)
+        Light lights[10];
+    };
+
 private:
     HRESULT SetupBackBuffer();
     HRESULT InitScene();
@@ -165,4 +179,6 @@ private:
     double m_rightDelta;
 
     size_t m_prevUSec;
+
+    SceneBuffer m_sceneBuffer;
 };
