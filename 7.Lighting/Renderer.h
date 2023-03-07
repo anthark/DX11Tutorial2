@@ -43,6 +43,12 @@ public:
         , m_pSphereVertexShader(nullptr)
         , m_pSphereInputLayout(nullptr)
         , m_sphereIndexCount(0)
+        , m_pSmallSphereVertexBuffer(nullptr)
+        , m_pSmallSphereIndexBuffer(nullptr)
+        , m_pSmallSpherePixelShader(nullptr)
+        , m_pSmallSphereVertexShader(nullptr)
+        , m_pSmallSphereInputLayout(nullptr)
+        , m_smallSphereIndexCount(0)
         , m_pCubemapTexture(nullptr)
         , m_pCubemapView(nullptr)
         , m_pRasterizerState(nullptr)
@@ -59,7 +65,13 @@ public:
         , m_pSampler(nullptr)
         , m_forwardDelta(0.0)
         , m_rightDelta(0.0)
-    {}
+        , m_showLightBulbs(true)
+    {
+        for (int i = 0; i < 10; i++)
+        {
+            m_pSmallSphereGeomBuffers[i] = nullptr;
+        }
+    }
 
     bool Init(HWND hWnd);
     void Term();
@@ -103,11 +115,13 @@ private:
     HRESULT SetupBackBuffer();
     HRESULT InitScene();
     HRESULT InitSphere();
+    HRESULT InitSmallSphere();
     HRESULT InitRect();
     HRESULT InitCubemap();
     void TermScene();
 
     void RenderSphere();
+    void RenderSmallSpheres();
     void RenderRects();
 
     HRESULT CompileAndCreateShader(const std::wstring& path, ID3D11DeviceChild** ppShader, ID3DBlob** ppCode = nullptr);
@@ -145,6 +159,15 @@ private:
     ID3D11InputLayout* m_pSphereInputLayout;
     UINT m_sphereIndexCount;
 
+    // For small sphere
+    ID3D11Buffer* m_pSmallSphereGeomBuffers[10];
+    ID3D11Buffer* m_pSmallSphereVertexBuffer;
+    ID3D11Buffer* m_pSmallSphereIndexBuffer;
+    ID3D11PixelShader* m_pSmallSpherePixelShader;
+    ID3D11VertexShader* m_pSmallSphereVertexShader;
+    ID3D11InputLayout* m_pSmallSphereInputLayout;
+    UINT m_smallSphereIndexCount;
+
     // For rect
     ID3D11Buffer* m_pRectGeomBuffer;
     ID3D11Buffer* m_pRectGeomBuffer2;
@@ -177,6 +200,8 @@ private:
     double m_angle;
     double m_forwardDelta;
     double m_rightDelta;
+
+    bool m_showLightBulbs;
 
     size_t m_prevUSec;
 

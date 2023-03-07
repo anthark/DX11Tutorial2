@@ -338,6 +338,18 @@ bool Renderer::Update()
         }
     }
 
+    // Move light bulb spheres
+    {
+        for (int i = 0; i < m_sceneBuffer.lightCount.x; i++)
+        {
+            RectGeomBuffer geomBuffer;
+            geomBuffer.m = DirectX::XMMatrixTranslation(m_sceneBuffer.lights[i].pos.x , m_sceneBuffer.lights[i].pos.y, m_sceneBuffer.lights[i].pos.z);
+            geomBuffer.color = m_sceneBuffer.lights[i].color;
+
+            m_pDeviceContext->UpdateSubresource(m_pSmallSphereGeomBuffers[i], 0, nullptr, &geomBuffer, 0, 0);
+        }
+    }
+
     m_prevUSec = usec;
 
     // Setup camera
@@ -438,6 +450,11 @@ bool Renderer::Render()
     m_pDeviceContext->PSSetConstantBuffers(1, 1, cbuffers2);
     m_pDeviceContext->DrawIndexed(36, 0, 0);
 
+    if (m_showLightBulbs)
+    {
+        RenderSmallSpheres();
+    }
+
     //RenderSphere();
 
     //RenderRects();
@@ -449,6 +466,8 @@ bool Renderer::Render()
 
     {
         ImGui::Begin("Lights");
+
+        ImGui::Checkbox("Show bulbs", &m_showLightBulbs);
 
         bool add = ImGui::Button("+");
         ImGui::SameLine();
@@ -1008,10 +1027,13 @@ HRESULT Renderer::InitScene()
     {
         result = InitCubemap();
     }
-
     if (SUCCEEDED(result))
     {
         result = InitRect();
+    }
+    if (SUCCEEDED(result))
+    {
+        result = InitSmallSphere();
     }
 
     assert(SUCCEEDED(result));
@@ -1141,6 +1163,140 @@ HRESULT Renderer::InitSphere()
             result = SetResourceName(m_pSphereGeomBuffer, "SphereGeomBuffer");
         }
     }
+
+    return result;
+}
+
+HRESULT Renderer::InitSmallSphere()
+{
+    static const D3D11_INPUT_ELEMENT_DESC InputDesc[] = {
+        {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0}
+    };
+
+    HRESULT result = S_OK;
+
+    static const size_t SphereSteps = 8;
+
+    std::vector<Point3f> sphereVertices;
+    std::vector<UINT16> indices;
+
+    size_t indexCount;
+    size_t vertexCount;
+
+    GetSphereDataSize(SphereSteps, SphereSteps, indexCount, vertexCount);
+
+    sphereVertices.resize(vertexCount);
+    indices.resize(indexCount);
+
+    m_smallSphereIndexCount = (UINT)indexCount;
+
+    CreateSphere(SphereSteps, SphereSteps, indices.data(), sphereVertices.data());
+
+    for (auto& v : sphereVertices)
+    {
+        v = v * 0.125f;
+    }
+
+    // Create vertex buffer
+    if (SUCCEEDED(result))
+    {
+        D3D11_BUFFER_DESC desc = {};
+        desc.ByteWidth = (UINT)(sphereVertices.size() * sizeof(Point3f));
+        desc.Usage = D3D11_USAGE_IMMUTABLE;
+        desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = 0;
+        desc.StructureByteStride = 0;
+
+        D3D11_SUBRESOURCE_DATA data;
+        data.pSysMem = sphereVertices.data();
+        data.SysMemPitch = (UINT)(sphereVertices.size() * sizeof(Point3f));
+        data.SysMemSlicePitch = 0;
+
+        result = m_pDevice->CreateBuffer(&desc, &data, &m_pSmallSphereVertexBuffer);
+        assert(SUCCEEDED(result));
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pSmallSphereVertexBuffer, "SmallSphereVertexBuffer");
+        }
+    }
+
+    // Create index buffer
+    if (SUCCEEDED(result))
+    {
+        D3D11_BUFFER_DESC desc = {};
+        desc.ByteWidth = (UINT)(indices.size() * sizeof(UINT16));
+        desc.Usage = D3D11_USAGE_IMMUTABLE;
+        desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = 0;
+        desc.StructureByteStride = 0;
+
+        D3D11_SUBRESOURCE_DATA data;
+        data.pSysMem = indices.data();
+        data.SysMemPitch = (UINT)(indices.size() * sizeof(UINT16));
+        data.SysMemSlicePitch = 0;
+
+        result = m_pDevice->CreateBuffer(&desc, &data, &m_pSmallSphereIndexBuffer);
+        assert(SUCCEEDED(result));
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pSmallSphereIndexBuffer, "SmallSphereIndexBuffer");
+        }
+    }
+
+    ID3DBlob* pSmallSphereVertexShaderCode = nullptr;
+    if (SUCCEEDED(result))
+    {
+        result = CompileAndCreateShader(L"TransColor.vs", (ID3D11DeviceChild**)&m_pSmallSphereVertexShader, &pSmallSphereVertexShaderCode);
+    }
+    if (SUCCEEDED(result))
+    {
+        result = CompileAndCreateShader(L"TransColor.ps", (ID3D11DeviceChild**)&m_pSmallSpherePixelShader);
+    }
+
+    if (SUCCEEDED(result))
+    {
+        result = m_pDevice->CreateInputLayout(InputDesc, 1, pSmallSphereVertexShaderCode->GetBufferPointer(), pSmallSphereVertexShaderCode->GetBufferSize(), &m_pSmallSphereInputLayout);
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pSmallSphereInputLayout, "SmallSphereInputLayout");
+        }
+    }
+
+    SAFE_RELEASE(pSmallSphereVertexShaderCode);
+
+    // Create geometry buffer
+    if (SUCCEEDED(result))
+    {
+        D3D11_BUFFER_DESC desc = {};
+        desc.ByteWidth = sizeof(RectGeomBuffer);
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = 0;
+        desc.StructureByteStride = 0;
+
+        RectGeomBuffer geomBuffer;
+        geomBuffer.m = DirectX::XMMatrixIdentity();
+        geomBuffer.color = Point4f{1,1,1,1};
+
+        D3D11_SUBRESOURCE_DATA data;
+        data.pSysMem = &geomBuffer;
+        data.SysMemPitch = sizeof(geomBuffer);
+        data.SysMemSlicePitch = 0;
+
+        for (int i = 0; i < 10 && SUCCEEDED(result); i++)
+        {
+            result = m_pDevice->CreateBuffer(&desc, &data, &m_pSmallSphereGeomBuffers[i]);
+            if (SUCCEEDED(result))
+            {
+                result = SetResourceName(m_pSmallSphereGeomBuffers[i], "SmallSphereGeomBuffer");
+            }
+        }
+    }
+
+    assert(SUCCEEDED(result));
 
     return result;
 }
@@ -1401,6 +1557,17 @@ void Renderer::TermScene()
     // Term depth buffer
     SAFE_RELEASE(m_pDepthBuffer);
     SAFE_RELEASE(m_pDepthBufferDSV);
+
+    // Term small sphere
+    SAFE_RELEASE(m_pSmallSphereIndexBuffer);
+    SAFE_RELEASE(m_pSmallSphereVertexBuffer);
+    SAFE_RELEASE(m_pSmallSphereInputLayout);
+    SAFE_RELEASE(m_pSmallSphereVertexShader);
+    SAFE_RELEASE(m_pSmallSpherePixelShader);
+    for (int i = 0; i < 10; i++)
+    {
+        SAFE_RELEASE(m_pSmallSphereGeomBuffers[i]);
+    }
 }
 
 void Renderer::RenderSphere()
@@ -1423,6 +1590,30 @@ void Renderer::RenderSphere()
     m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
     m_pDeviceContext->PSSetShader(m_pSpherePixelShader, nullptr, 0);
     m_pDeviceContext->DrawIndexed(m_sphereIndexCount, 0, 0);
+}
+
+void Renderer::RenderSmallSpheres()
+{
+    m_pDeviceContext->OMSetBlendState(m_pOpaqueBlendState, nullptr, 0xffffffff);
+    m_pDeviceContext->OMSetDepthStencilState(m_pDepthState, 0);
+
+    m_pDeviceContext->IASetIndexBuffer(m_pSmallSphereIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
+    ID3D11Buffer* vertexBuffers[] = { m_pSmallSphereVertexBuffer };
+    UINT strides[] = { 12 };
+    UINT offsets[] = { 0 };
+    m_pDeviceContext->IASetVertexBuffers(0, 1, vertexBuffers, strides, offsets);
+    m_pDeviceContext->IASetInputLayout(m_pSmallSphereInputLayout);
+    m_pDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    m_pDeviceContext->VSSetShader(m_pSmallSphereVertexShader, nullptr, 0);
+    m_pDeviceContext->PSSetShader(m_pSmallSpherePixelShader, nullptr, 0);
+
+    for (int i = 0; i < m_sceneBuffer.lightCount.x; i++)
+    {
+        ID3D11Buffer* cbuffers[] = { m_pSceneBuffer, m_pSmallSphereGeomBuffers[i] };
+        m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
+        m_pDeviceContext->PSSetConstantBuffers(0, 2, cbuffers);
+        m_pDeviceContext->DrawIndexed(m_smallSphereIndexCount, 0, 0);
+    }
 }
 
 void Renderer::RenderRects()
