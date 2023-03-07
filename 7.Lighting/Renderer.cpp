@@ -33,6 +33,7 @@ struct GeomBuffer
 {
     DirectX::XMMATRIX m;
     DirectX::XMMATRIX normalM;
+    Point4f shine; // x - shininess
 };
 
 struct SphereGeomBuffer
@@ -309,6 +310,7 @@ bool Renderer::Update()
         m = DirectX::XMMatrixInverse(nullptr, m);
         m = DirectX::XMMatrixTranspose(m);
         geomBuffer.normalM = m;
+        geomBuffer.shine.x = 0.0f;
 
         m_pDeviceContext->UpdateSubresource(m_pGeomBuffer, 0, nullptr, &geomBuffer, 0, 0);
 
@@ -316,6 +318,7 @@ bool Renderer::Update()
         m = DirectX::XMMatrixTranslation(2.0f, 0.0f, 0.0f);
         geomBuffer.m = m;
         geomBuffer.normalM = DirectX::XMMatrixIdentity();
+        geomBuffer.shine.x = 64.0f;
         m_pDeviceContext->UpdateSubresource(m_pGeomBuffer2, 0, nullptr, &geomBuffer, 0, 0);
 
         // Model matrix for rect

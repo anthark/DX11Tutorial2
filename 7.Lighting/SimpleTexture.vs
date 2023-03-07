@@ -4,6 +4,7 @@ cbuffer GeomBuffer : register (b1)
 {
     float4x4 model;
     float4x4 norm;
+    float4 shine; // x - shininess
 };
 
 struct VSInput

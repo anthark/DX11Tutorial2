@@ -1,5 +1,12 @@
 #include "SceneCB.h"
 
+cbuffer GeomBuffer : register (b1)
+{
+    float4x4 model;
+    float4x4 norm;
+    float4 shine; // x - shininess
+};
+
 Texture2D colorTexture : register (t0);
 
 SamplerState colorSampler : register(s0);
@@ -24,9 +31,18 @@ float4 ps(VSOutput pixel) : SV_Target0
         float lightDist = length(lightDir);
         lightDir /= lightDist;
 
-        float atten = clamp(dot(lightDir, pixel.norm) / (lightDist * lightDist), 0, 1);
+        float atten = clamp(1.0 / (lightDist * lightDist), 0, 1);
 
-        finalColor += color * atten * lights[i].color.xyz;
+        // Diffuse part
+        finalColor += color * max(dot(lightDir, pixel.norm),0) * atten * lights[i].color.xyz;
+
+        float3 viewDir = normalize(cameraPos.xyz - pixel.worldPos.xyz);
+        float3 reflectDir = reflect(-lightDir, pixel.norm);
+
+        float spec = shine.x > 0 ? pow(max(dot(viewDir, reflectDir), 0.0), shine.x) : 0.0;
+
+        // Specular part
+        finalColor += color * 0.5 * spec * lights[i].color.xyz;
     }
 
     return float4(finalColor, 1.0);
