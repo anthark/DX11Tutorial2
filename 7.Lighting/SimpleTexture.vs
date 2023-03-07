@@ -3,6 +3,7 @@
 cbuffer GeomBuffer : register (b1)
 {
     float4x4 model;
+    float4x4 norm;
 };
 
 struct VSInput
@@ -29,7 +30,7 @@ VSOutput vs(VSInput vertex)
     result.pos = mul(vp, worldPos);
     result.worldPos = worldPos;
     result.uv = vertex.uv;
-    result.norm = vertex.norm;
+    result.norm = mul(norm, float4(vertex.norm, 0)).xyz;
 
     return result;
 }

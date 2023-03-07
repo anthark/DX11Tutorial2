@@ -32,6 +32,7 @@ struct ColorVertex
 struct GeomBuffer
 {
     DirectX::XMMATRIX m;
+    DirectX::XMMATRIX normalM;
 };
 
 struct SphereGeomBuffer
@@ -305,12 +306,16 @@ bool Renderer::Update()
         DirectX::XMMATRIX m = DirectX::XMMatrixRotationAxis(DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f), -(float)m_angle);
 
         geomBuffer.m = m;
+        m = DirectX::XMMatrixInverse(nullptr, m);
+        m = DirectX::XMMatrixTranspose(m);
+        geomBuffer.normalM = m;
 
         m_pDeviceContext->UpdateSubresource(m_pGeomBuffer, 0, nullptr, &geomBuffer, 0, 0);
 
         // Model matrix for second cube
         m = DirectX::XMMatrixTranslation(2.0f, 0.0f, 0.0f);
         geomBuffer.m = m;
+        geomBuffer.normalM = DirectX::XMMatrixIdentity();
         m_pDeviceContext->UpdateSubresource(m_pGeomBuffer2, 0, nullptr, &geomBuffer, 0, 0);
 
         // Model matrix for rect
