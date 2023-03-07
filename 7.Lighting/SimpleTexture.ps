@@ -8,6 +8,7 @@ cbuffer GeomBuffer : register (b1)
 };
 
 Texture2D colorTexture : register (t0);
+Texture2D normalMapTexture : register (t1);
 
 SamplerState colorSampler : register(s0);
 
@@ -15,6 +16,7 @@ struct VSOutput
 {
     float4 pos : SV_Position;
     float4 worldPos : POSITION;
+    float3 tang : TANGENT;
     float3 norm : NORMAL;
     float2 uv : TEXCOORD;
 };
@@ -25,6 +27,23 @@ float4 ps(VSOutput pixel) : SV_Target0
 
     float3 color = colorTexture.Sample(colorSampler, pixel.uv).xyz;
 
+    float3 normal = float3(0,0,0);
+    if (lightCount.y > 0)
+    {
+        float3 binorm = cross(pixel.tang, pixel.norm);
+        float3 localNorm = normalMapTexture.Sample(colorSampler, pixel.uv).xyz * 2.0 - float3(1.0, 1.0, 1.0);
+        normal = localNorm.x * pixel.tang + localNorm.y * binorm + localNorm.z * pixel.norm;
+    }
+    else
+    {
+        normal = pixel.norm;
+    }
+
+    if (lightCount.z > 0)
+    {
+        return float4(normal * 0.5 + float3(0.5,0.5,0.5), 1.0);
+    }
+
     for (int i = 0; i < lightCount.x; i++)
     {
         float3 lightDir = lights[i].pos.xyz - pixel.worldPos.xyz;
@@ -34,10 +53,10 @@ float4 ps(VSOutput pixel) : SV_Target0
         float atten = clamp(1.0 / (lightDist * lightDist), 0, 1);
 
         // Diffuse part
-        finalColor += color * max(dot(lightDir, pixel.norm),0) * atten * lights[i].color.xyz;
+        finalColor += color * max(dot(lightDir, normal),0) * atten * lights[i].color.xyz;
 
         float3 viewDir = normalize(cameraPos.xyz - pixel.worldPos.xyz);
-        float3 reflectDir = reflect(-lightDir, pixel.norm);
+        float3 reflectDir = reflect(-lightDir, normal);
 
         float spec = shine.x > 0 ? pow(max(dot(viewDir, reflectDir), 0.0), shine.x) : 0.0;
 

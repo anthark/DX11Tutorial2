@@ -16,9 +16,10 @@
 #include "backends/imgui_impl_dx11.h"
 #include "backends/imgui_impl_win32.h"
 
-struct TextureNormalVertex
+struct TextureTangentVertex
 {
     Point3f pos;
+    Point3f tangent;
     Point3f norm;
     Point2f uv;
 };
@@ -428,12 +429,12 @@ bool Renderer::Render()
     ID3D11SamplerState* samplers[] = {m_pSampler};
     m_pDeviceContext->PSSetSamplers(0, 1, samplers);
 
-    ID3D11ShaderResourceView* resources[] = {m_pTextureView};
-    m_pDeviceContext->PSSetShaderResources(0, 1, resources);
+    ID3D11ShaderResourceView* resources[] = {m_pTextureView, m_pTextureViewNM};
+    m_pDeviceContext->PSSetShaderResources(0, 2, resources);
 
     m_pDeviceContext->IASetIndexBuffer(m_pIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
     ID3D11Buffer* vertexBuffers[] = {m_pVertexBuffer};
-    UINT strides[] = {32};
+    UINT strides[] = {44};
     UINT offsets[] = {0};
     ID3D11Buffer* cbuffers[] = {m_pSceneBuffer, m_pGeomBuffer};
     m_pDeviceContext->IASetVertexBuffers(0, 1, vertexBuffers, strides, offsets);
@@ -468,6 +469,11 @@ bool Renderer::Render()
         ImGui::Begin("Lights");
 
         ImGui::Checkbox("Show bulbs", &m_showLightBulbs);
+        ImGui::Checkbox("Use normal maps", &m_useNormalMaps);
+        ImGui::Checkbox("Show normals", &m_showNormals);
+
+        m_sceneBuffer.lightCount.y = m_useNormalMaps ? 1 : 0;
+        m_sceneBuffer.lightCount.z = m_showNormals ? 1 : 0;
 
         bool add = ImGui::Button("+");
         ImGui::SameLine();
@@ -682,37 +688,37 @@ HRESULT Renderer::SetupBackBuffer()
 HRESULT Renderer::InitScene()
 {
     // Textured cube
-    static const TextureNormalVertex Vertices[24] = {
+    static const TextureTangentVertex Vertices[24] = {
         // Bottom face
-        {Point3f{-0.5, -0.5,  0.5}, Point3f{0, -1, 0}, Point2f{0, 1}},
-        {Point3f{ 0.5, -0.5,  0.5}, Point3f{0, -1, 0}, Point2f{1, 1}},
-        {Point3f{ 0.5, -0.5, -0.5}, Point3f{0, -1, 0}, Point2f{1, 0}},
-        {Point3f{-0.5, -0.5, -0.5}, Point3f{0, -1, 0}, Point2f{0, 0}},
+        {Point3f{-0.5, -0.5,  0.5}, Point3f{1, 0, 0}, Point3f{0, -1, 0}, Point2f{0, 1}},
+        {Point3f{ 0.5, -0.5,  0.5}, Point3f{1, 0, 0}, Point3f{0, -1, 0}, Point2f{1, 1}},
+        {Point3f{ 0.5, -0.5, -0.5}, Point3f{1, 0, 0}, Point3f{0, -1, 0}, Point2f{1, 0}},
+        {Point3f{-0.5, -0.5, -0.5}, Point3f{1, 0, 0}, Point3f{0, -1, 0}, Point2f{0, 0}},
         // Top face
-        {Point3f{-0.5,  0.5, -0.5}, Point3f{0, 1, 0}, Point2f{0, 1}},
-        {Point3f{ 0.5,  0.5, -0.5}, Point3f{0, 1, 0}, Point2f{1, 1}},
-        {Point3f{ 0.5,  0.5,  0.5}, Point3f{0, 1, 0}, Point2f{1, 0}},
-        {Point3f{-0.5,  0.5,  0.5}, Point3f{0, 1, 0}, Point2f{0, 0}},
+        {Point3f{-0.5,  0.5, -0.5}, Point3f{1, 0, 0}, Point3f{0, 1, 0}, Point2f{0, 1}},
+        {Point3f{ 0.5,  0.5, -0.5}, Point3f{1, 0, 0}, Point3f{0, 1, 0}, Point2f{1, 1}},
+        {Point3f{ 0.5,  0.5,  0.5}, Point3f{1, 0, 0}, Point3f{0, 1, 0}, Point2f{1, 0}},
+        {Point3f{-0.5,  0.5,  0.5}, Point3f{1, 0, 0}, Point3f{0, 1, 0}, Point2f{0, 0}},
         // Front face
-        {Point3f{ 0.5, -0.5, -0.5}, Point3f{1, 0, 0}, Point2f{0, 1}},
-        {Point3f{ 0.5, -0.5,  0.5}, Point3f{1, 0, 0}, Point2f{1, 1}},
-        {Point3f{ 0.5,  0.5,  0.5}, Point3f{1, 0, 0}, Point2f{1, 0}},
-        {Point3f{ 0.5,  0.5, -0.5}, Point3f{1, 0, 0}, Point2f{0, 0}},
+        {Point3f{ 0.5, -0.5, -0.5}, Point3f{0, 0, 1}, Point3f{1, 0, 0}, Point2f{0, 1}},
+        {Point3f{ 0.5, -0.5,  0.5}, Point3f{0, 0, 1}, Point3f{1, 0, 0}, Point2f{1, 1}},
+        {Point3f{ 0.5,  0.5,  0.5}, Point3f{0, 0, 1}, Point3f{1, 0, 0}, Point2f{1, 0}},
+        {Point3f{ 0.5,  0.5, -0.5}, Point3f{0, 0, 1}, Point3f{1, 0, 0}, Point2f{0, 0}},
         // Back face
-        {Point3f{-0.5, -0.5,  0.5}, Point3f{-1, 0, 0}, Point2f{0, 1}},
-        {Point3f{-0.5, -0.5, -0.5}, Point3f{-1, 0, 0}, Point2f{1, 1}},
-        {Point3f{-0.5,  0.5, -0.5}, Point3f{-1, 0, 0}, Point2f{1, 0}},
-        {Point3f{-0.5,  0.5,  0.5}, Point3f{-1, 0, 0}, Point2f{0, 0}},
+        {Point3f{-0.5, -0.5,  0.5}, Point3f{0, 0, -1}, Point3f{-1, 0, 0}, Point2f{0, 1}},
+        {Point3f{-0.5, -0.5, -0.5}, Point3f{0, 0, -1}, Point3f{-1, 0, 0}, Point2f{1, 1}},
+        {Point3f{-0.5,  0.5, -0.5}, Point3f{0, 0, -1}, Point3f{-1, 0, 0}, Point2f{1, 0}},
+        {Point3f{-0.5,  0.5,  0.5}, Point3f{0, 0, -1}, Point3f{-1, 0, 0}, Point2f{0, 0}},
         // Left face
-        {Point3f{ 0.5, -0.5,  0.5}, Point3f{0, 0, 1}, Point2f{0, 1}},
-        {Point3f{-0.5, -0.5,  0.5}, Point3f{0, 0, 1}, Point2f{1, 1}},
-        {Point3f{-0.5,  0.5,  0.5}, Point3f{0, 0, 1}, Point2f{1, 0}},
-        {Point3f{ 0.5,  0.5,  0.5}, Point3f{0, 0, 1}, Point2f{0, 0}},
+        {Point3f{ 0.5, -0.5,  0.5}, Point3f{-1, 0, 0}, Point3f{0, 0, 1}, Point2f{0, 1}},
+        {Point3f{-0.5, -0.5,  0.5}, Point3f{-1, 0, 0}, Point3f{0, 0, 1}, Point2f{1, 1}},
+        {Point3f{-0.5,  0.5,  0.5}, Point3f{-1, 0, 0}, Point3f{0, 0, 1}, Point2f{1, 0}},
+        {Point3f{ 0.5,  0.5,  0.5}, Point3f{-1, 0, 0}, Point3f{0, 0, 1}, Point2f{0, 0}},
         // Right face
-        {Point3f{-0.5, -0.5, -0.5}, Point3f{0, 0, -1}, Point2f{0, 1}},
-        {Point3f{ 0.5, -0.5, -0.5}, Point3f{0, 0, -1}, Point2f{1, 1}},
-        {Point3f{ 0.5,  0.5, -0.5}, Point3f{0, 0, -1}, Point2f{1, 0}},
-        {Point3f{-0.5,  0.5, -0.5}, Point3f{0, 0, -1}, Point2f{0, 0}}
+        {Point3f{-0.5, -0.5, -0.5}, Point3f{1, 0, 0}, Point3f{0, 0, -1}, Point2f{0, 1}},
+        {Point3f{ 0.5, -0.5, -0.5}, Point3f{1, 0, 0}, Point3f{0, 0, -1}, Point2f{1, 1}},
+        {Point3f{ 0.5,  0.5, -0.5}, Point3f{1, 0, 0}, Point3f{0, 0, -1}, Point2f{1, 0}},
+        {Point3f{-0.5,  0.5, -0.5}, Point3f{1, 0, 0}, Point3f{0, 0, -1}, Point2f{0, 0}}
     };
     static const UINT16 Indices[36] = {
         0, 2, 1, 0, 3, 2,
@@ -724,8 +730,9 @@ HRESULT Renderer::InitScene()
     };
     static const D3D11_INPUT_ELEMENT_DESC InputDesc[] = {
         {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
-        {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
-        {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0}
+        {"TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
+        {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0},
+        {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 36, D3D11_INPUT_PER_VERTEX_DATA, 0}
     };
 
     HRESULT result = S_OK;
@@ -790,7 +797,7 @@ HRESULT Renderer::InitScene()
 
     if (SUCCEEDED(result))
     {
-        result = m_pDevice->CreateInputLayout(InputDesc, 3, pVertexShaderCode->GetBufferPointer(), pVertexShaderCode->GetBufferSize(), &m_pInputLayout);
+        result = m_pDevice->CreateInputLayout(InputDesc, 4, pVertexShaderCode->GetBufferPointer(), pVertexShaderCode->GetBufferSize(), &m_pInputLayout);
         if (SUCCEEDED(result))
         {
             result = SetResourceName(m_pInputLayout, "InputLayout");
@@ -999,6 +1006,66 @@ HRESULT Renderer::InitScene()
 
         result = m_pDevice->CreateShaderResourceView(m_pTexture, &desc, &m_pTextureView);
     }
+    if (SUCCEEDED(result))
+    {
+        const std::wstring TextureName = L"../Common/BrickNM.dds";
+
+        TextureDesc textureDesc;
+        bool ddsRes = LoadDDS(TextureName.c_str(), textureDesc);
+
+        textureFmt = textureDesc.fmt;
+
+        D3D11_TEXTURE2D_DESC desc = {};
+        desc.Format = textureDesc.fmt;
+        desc.ArraySize = 1;
+        desc.MipLevels = textureDesc.mipmapsCount;
+        desc.Usage = D3D11_USAGE_IMMUTABLE;
+        desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = 0;
+        desc.SampleDesc.Count = 1;
+        desc.SampleDesc.Quality = 0;
+        desc.Height = textureDesc.height;
+        desc.Width = textureDesc.width;
+
+        UINT32 blockWidth = DivUp(desc.Width, 4u);
+        UINT32 blockHeight = DivUp(desc.Height, 4u);
+        UINT32 pitch = blockWidth * GetBytesPerBlock(desc.Format);
+        const char* pSrcData = reinterpret_cast<const char*>(textureDesc.pData);
+
+        std::vector<D3D11_SUBRESOURCE_DATA> data;
+        data.resize(desc.MipLevels);
+        for (UINT32 i = 0; i < desc.MipLevels; i++)
+        {
+            data[i].pSysMem = pSrcData;
+            data[i].SysMemPitch = pitch;
+            data[i].SysMemSlicePitch = 0;
+
+            pSrcData += pitch * blockHeight;
+            blockHeight = std::max(1u, blockHeight / 2);
+            blockWidth = std::max(1u, blockWidth / 2);
+            pitch = blockWidth * GetBytesPerBlock(desc.Format);
+        }
+        result = m_pDevice->CreateTexture2D(&desc, data.data(), &m_pTextureNM);
+        assert(SUCCEEDED(result));
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pTextureNM, WCSToMBS(TextureName));
+        }
+
+        free(textureDesc.pData);
+    }
+    if (SUCCEEDED(result))
+    {
+        D3D11_SHADER_RESOURCE_VIEW_DESC desc = {};
+        desc.Format = textureFmt;
+        desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+        desc.Texture2D.MipLevels = 11;
+        desc.Texture2D.MostDetailedMip = 0;
+
+        result = m_pDevice->CreateShaderResourceView(m_pTextureNM, &desc, &m_pTextureViewNM);
+    }
+
     if (SUCCEEDED(result))
     {
         D3D11_SAMPLER_DESC desc = {};
@@ -1511,6 +1578,8 @@ void Renderer::TermScene()
 
     SAFE_RELEASE(m_pTextureView);
     SAFE_RELEASE(m_pTexture);
+    SAFE_RELEASE(m_pTextureViewNM);
+    SAFE_RELEASE(m_pTextureNM);
 
     SAFE_RELEASE(m_pRasterizerState);
     SAFE_RELEASE(m_pDepthState);

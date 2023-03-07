@@ -10,6 +10,7 @@ cbuffer GeomBuffer : register (b1)
 struct VSInput
 {
     float3 pos : POSITION;
+    float3 tang : TANGENT;
     float3 norm : NORMAL;
     float2 uv : TEXCOORD;
 };
@@ -18,6 +19,7 @@ struct VSOutput
 {
     float4 pos : SV_Position;
     float4 worldPos : POSITION;
+    float3 tang : TANGENT;
     float3 norm : NORMAL;
     float2 uv : TEXCOORD;
 };
@@ -31,6 +33,7 @@ VSOutput vs(VSInput vertex)
     result.pos = mul(vp, worldPos);
     result.worldPos = worldPos;
     result.uv = vertex.uv;
+    result.tang = mul(norm, float4(vertex.tang, 0)).xyz;
     result.norm = mul(norm, float4(vertex.norm, 0)).xyz;
 
     return result;

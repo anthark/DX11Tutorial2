@@ -62,10 +62,14 @@ public:
         , m_angle(0.0)
         , m_pTexture(nullptr)
         , m_pTextureView(nullptr)
+        , m_pTextureNM(nullptr)
+        , m_pTextureViewNM(nullptr)
         , m_pSampler(nullptr)
         , m_forwardDelta(0.0)
         , m_rightDelta(0.0)
         , m_showLightBulbs(true)
+        , m_useNormalMaps(true)
+        , m_showNormals(false)
     {
         for (int i = 0; i < 10; i++)
         {
@@ -187,6 +191,8 @@ private:
 
     ID3D11Texture2D* m_pTexture;
     ID3D11ShaderResourceView* m_pTextureView;
+    ID3D11Texture2D* m_pTextureNM;
+    ID3D11ShaderResourceView* m_pTextureViewNM;
     ID3D11SamplerState* m_pSampler;
 
     UINT m_width;
@@ -202,6 +208,8 @@ private:
     double m_rightDelta;
 
     bool m_showLightBulbs;
+    bool m_useNormalMaps;
+    bool m_showNormals;
 
     size_t m_prevUSec;
 
