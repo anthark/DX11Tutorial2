@@ -23,9 +23,8 @@ struct VSOutput
 
 float4 ps(VSOutput pixel) : SV_Target0
 {
-    float3 finalColor = float3(0,0,0);
-
     float3 color = colorTexture.Sample(colorSampler, pixel.uv).xyz;
+    float3 finalColor = ambientColor * color;
 
     float3 normal = float3(0,0,0);
     if (lightCount.y > 0)

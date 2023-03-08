@@ -235,6 +235,7 @@ bool Renderer::Init(HWND hWnd)
         m_sceneBuffer.lightCount.x = 1;
         m_sceneBuffer.lights[0].pos = Point4f{0, 1.05f, 0, 1};
         m_sceneBuffer.lights[0].color = Point4f{1,1,0};
+        m_sceneBuffer.ambientColor = Point4f(0,0,0.2f,0);
     }
 
     if (FAILED(result))

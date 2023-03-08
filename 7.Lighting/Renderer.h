@@ -113,6 +113,7 @@ private:
         Point4f cameraPos;
         Point4i lightCount; // x - light count (max 10)
         Light lights[10];
+        Point4f ambientColor;
     };
 
 private:
