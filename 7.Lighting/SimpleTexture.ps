@@ -29,9 +29,9 @@ float4 ps(VSOutput pixel) : SV_Target0
     float3 normal = float3(0,0,0);
     if (lightCount.y > 0)
     {
-        float3 binorm = cross(pixel.tang, pixel.norm);
+        float3 binorm = normalize(cross(pixel.norm, pixel.tang));
         float3 localNorm = normalMapTexture.Sample(colorSampler, pixel.uv).xyz * 2.0 - float3(1.0, 1.0, 1.0);
-        normal = localNorm.x * pixel.tang + localNorm.y * binorm + localNorm.z * pixel.norm;
+        normal = localNorm.x * normalize(pixel.tang) + localNorm.y * binorm + localNorm.z * normalize(pixel.norm);
     }
     else
     {
@@ -60,7 +60,7 @@ float4 ps(VSOutput pixel) : SV_Target0
         float spec = shine.x > 0 ? pow(max(dot(viewDir, reflectDir), 0.0), shine.x) : 0.0;
 
         // Specular part
-        finalColor += color * 0.5 * spec * lights[i].color.xyz;
+        finalColor += color * spec * lights[i].color.xyz;
     }
 
     return float4(finalColor, 1.0);
