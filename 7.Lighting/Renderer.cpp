@@ -328,13 +328,13 @@ bool Renderer::Update()
 
             m = DirectX::XMMatrixTranslation(1.0f, 0.0f, 0.0f);
             rectGeomBuffer.m = m;
-            rectGeomBuffer.color = Point4f{0.5f, 0, 0.5f, 1.0f};
+            rectGeomBuffer.color = Point4f{0.5f, 0, 0.5f, 0.5f};
             m_pDeviceContext->UpdateSubresource(m_pRectGeomBuffer, 0, nullptr, &rectGeomBuffer, 0, 0);
 
             // Model matrix for second rect
             m = DirectX::XMMatrixTranslation(1.2f, 0.0f, 0.0f);
             rectGeomBuffer.m = m;
-            rectGeomBuffer.color = Point4f{ 0.5f, 0.5f, 0, 1.0f };
+            rectGeomBuffer.color = Point4f{ 0.5f, 0.5f, 0, 0.5f };
             m_pDeviceContext->UpdateSubresource(m_pRectGeomBuffer2, 0, nullptr, &rectGeomBuffer, 0, 0);
         }
     }
@@ -456,9 +456,9 @@ bool Renderer::Render()
         RenderSmallSpheres();
     }
 
-    //RenderSphere();
+    RenderSphere();
 
-    //RenderRects();
+    RenderRects();
 
     // Start the Dear ImGui frame
     ImGui_ImplDX11_NewFrame();
@@ -788,7 +788,7 @@ HRESULT Renderer::InitScene()
     ID3DBlob* pVertexShaderCode = nullptr;
     if (SUCCEEDED(result))
     {
-        result = CompileAndCreateShader(L"SimpleTexture.vs", (ID3D11DeviceChild**)&m_pVertexShader, &pVertexShaderCode);
+        result = CompileAndCreateShader(L"SimpleTexture.vs", (ID3D11DeviceChild**)&m_pVertexShader, {}, &pVertexShaderCode);
     }
     if (SUCCEEDED(result))
     {
@@ -1184,7 +1184,7 @@ HRESULT Renderer::InitSphere()
     ID3DBlob* pSphereVertexShaderCode = nullptr;
     if (SUCCEEDED(result))
     {
-        result = CompileAndCreateShader(L"SphereTexture.vs", (ID3D11DeviceChild**)&m_pSphereVertexShader, &pSphereVertexShaderCode);
+        result = CompileAndCreateShader(L"SphereTexture.vs", (ID3D11DeviceChild**)&m_pSphereVertexShader, {}, &pSphereVertexShaderCode);
     }
     if (SUCCEEDED(result))
     {
@@ -1315,7 +1315,7 @@ HRESULT Renderer::InitSmallSphere()
     ID3DBlob* pSmallSphereVertexShaderCode = nullptr;
     if (SUCCEEDED(result))
     {
-        result = CompileAndCreateShader(L"TransColor.vs", (ID3D11DeviceChild**)&m_pSmallSphereVertexShader, &pSmallSphereVertexShaderCode);
+        result = CompileAndCreateShader(L"TransColor.vs", (ID3D11DeviceChild**)&m_pSmallSphereVertexShader, {}, &pSmallSphereVertexShaderCode);
     }
     if (SUCCEEDED(result))
     {
@@ -1440,11 +1440,11 @@ HRESULT Renderer::InitRect()
     ID3DBlob* pRectVertexShaderCode = nullptr;
     if (SUCCEEDED(result))
     {
-        result = CompileAndCreateShader(L"TransColor.vs", (ID3D11DeviceChild**)&m_pRectVertexShader, &pRectVertexShaderCode);
+        result = CompileAndCreateShader(L"TransColor.vs", (ID3D11DeviceChild**)&m_pRectVertexShader, {}, &pRectVertexShaderCode);
     }
     if (SUCCEEDED(result))
     {
-        result = CompileAndCreateShader(L"TransColor.ps", (ID3D11DeviceChild**)&m_pRectPixelShader);
+        result = CompileAndCreateShader(L"TransColor.ps", (ID3D11DeviceChild**)&m_pRectPixelShader, { "USE_LIGHTS" });
     }
 
     if (SUCCEEDED(result))
@@ -1778,7 +1778,7 @@ class D3DInclude : public ID3DInclude
     }
 };
 
-HRESULT Renderer::CompileAndCreateShader(const std::wstring& path, ID3D11DeviceChild** ppShader, ID3DBlob** ppCode)
+HRESULT Renderer::CompileAndCreateShader(const std::wstring& path, ID3D11DeviceChild** ppShader, const std::vector<std::string>& defines, ID3DBlob** ppCode)
 {
     // Try to load shader's source code first
     FILE* pFile = nullptr;
@@ -1826,10 +1826,20 @@ HRESULT Renderer::CompileAndCreateShader(const std::wstring& path, ID3D11DeviceC
 
     D3DInclude includeHandler;
 
+    std::vector<D3D_SHADER_MACRO> shaderDefines;
+    shaderDefines.resize(defines.size() + 1);
+    for (int i = 0; i < defines.size(); i++)
+    {
+        shaderDefines[i].Name = defines[i].c_str();
+        shaderDefines[i].Definition = "";
+    }
+    shaderDefines.back().Name = nullptr;
+    shaderDefines.back().Definition = nullptr;
+
     // Try to compile
     ID3DBlob* pCode = nullptr;
     ID3DBlob* pErrMsg = nullptr;
-    HRESULT result = D3DCompile(data.data(), data.size(), WCSToMBS(path).c_str(), nullptr, &includeHandler, entryPoint.c_str(), platform.c_str(), flags1, 0, &pCode, &pErrMsg);
+    HRESULT result = D3DCompile(data.data(), data.size(), WCSToMBS(path).c_str(), shaderDefines.data(), &includeHandler, entryPoint.c_str(), platform.c_str(), flags1, 0, &pCode, &pErrMsg);
     if (!SUCCEEDED(result) && pErrMsg != nullptr)
     {
         OutputDebugStringA((const char*)pErrMsg->GetBufferPointer());

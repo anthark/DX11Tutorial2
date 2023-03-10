@@ -128,7 +128,7 @@ private:
     void RenderSmallSpheres();
     void RenderRects();
 
-    HRESULT CompileAndCreateShader(const std::wstring& path, ID3D11DeviceChild** ppShader, ID3DBlob** ppCode = nullptr);
+    HRESULT CompileAndCreateShader(const std::wstring& path, ID3D11DeviceChild** ppShader, const std::vector<std::string>& defines = {}, ID3DBlob** ppCode = nullptr);
 
 private:
     ID3D11Device* m_pDevice;

@@ -1,4 +1,4 @@
-#include "SceneCB.h"
+#include "Light.h"
 
 cbuffer GeomBuffer : register (b1)
 {
@@ -23,8 +23,6 @@ struct VSOutput
 
 float4 ps(VSOutput pixel) : SV_Target0
 {
-    float3 finalColor = float3(0,0,0);
-
     float3 color = colorTexture.Sample(colorSampler, pixel.uv).xyz;
 
     float3 normal = float3(0,0,0);
@@ -39,30 +37,5 @@ float4 ps(VSOutput pixel) : SV_Target0
         normal = pixel.norm;
     }
 
-    if (lightCount.z > 0)
-    {
-        return float4(normal * 0.5 + float3(0.5,0.5,0.5), 1.0);
-    }
-
-    for (int i = 0; i < lightCount.x; i++)
-    {
-        float3 lightDir = lights[i].pos.xyz - pixel.worldPos.xyz;
-        float lightDist = length(lightDir);
-        lightDir /= lightDist;
-
-        float atten = clamp(1.0 / (lightDist * lightDist), 0, 1);
-
-        // Diffuse part
-        finalColor += color * max(dot(lightDir, normal),0) * atten * lights[i].color.xyz;
-
-        float3 viewDir = normalize(cameraPos.xyz - pixel.worldPos.xyz);
-        float3 reflectDir = reflect(-lightDir, normal);
-
-        float spec = shine.x > 0 ? pow(max(dot(viewDir, reflectDir), 0.0), shine.x) : 0.0;
-
-        // Specular part
-        finalColor += color * 0.5 * spec * lights[i].color.xyz;
-    }
-
-    return float4(finalColor, 1.0);
+    return float4(CalculateColor(color, normal, pixel.worldPos.xyz, shine.x, false), 1.0);
 }
