@@ -122,6 +122,9 @@ void Renderer::Camera::GetDirections(Point3f& forward, Point3f& right)
 
 const double Renderer::PanSpeed = 2.0;
 
+const Point3f Renderer::Rect0Pos = Point3f{ 1.0f, 0, 0 };
+const Point3f Renderer::Rect1Pos = Point3f{ 1.2f, 0, 0 };
+
 bool Renderer::Init(HWND hWnd)
 {
     HRESULT result;
@@ -321,22 +324,6 @@ bool Renderer::Update()
         geomBuffer.normalM = DirectX::XMMatrixIdentity();
         geomBuffer.shine.x = 64.0f;
         m_pDeviceContext->UpdateSubresource(m_pGeomBuffer2, 0, nullptr, &geomBuffer, 0, 0);
-
-        // Model matrix for rect
-        {
-            RectGeomBuffer rectGeomBuffer;
-
-            m = DirectX::XMMatrixTranslation(1.0f, 0.0f, 0.0f);
-            rectGeomBuffer.m = m;
-            rectGeomBuffer.color = Point4f{0.5f, 0, 0.5f, 0.5f};
-            m_pDeviceContext->UpdateSubresource(m_pRectGeomBuffer, 0, nullptr, &rectGeomBuffer, 0, 0);
-
-            // Model matrix for second rect
-            m = DirectX::XMMatrixTranslation(1.2f, 0.0f, 0.0f);
-            rectGeomBuffer.m = m;
-            rectGeomBuffer.color = Point4f{ 0.5f, 0.5f, 0, 0.5f };
-            m_pDeviceContext->UpdateSubresource(m_pRectGeomBuffer2, 0, nullptr, &rectGeomBuffer, 0, 0);
-        }
     }
 
     // Move light bulb spheres
@@ -1387,6 +1374,12 @@ HRESULT Renderer::InitRect()
         0, 2, 3
     };
 
+    for (int i = 0; i < 4; i++)
+    {
+        m_boundingRects[0].v[i] = Point3f{ Vertices[i].x, Vertices[i].y, Vertices[i].z } + Rect0Pos;
+        m_boundingRects[1].v[i] = Point3f{ Vertices[i].x, Vertices[i].y, Vertices[i].z } + Rect1Pos;
+    }
+
     HRESULT result = S_OK;
 
     // Create vertex buffer
@@ -1470,8 +1463,8 @@ HRESULT Renderer::InitRect()
         desc.StructureByteStride = 0;
 
         RectGeomBuffer geomBuffer;
-        geomBuffer.m = DirectX::XMMatrixIdentity();
-        geomBuffer.color = Point4f{ 1,1,1,1 };
+        geomBuffer.m = DirectX::XMMatrixTranslation(Rect0Pos.x, Rect0Pos.y, Rect0Pos.z);
+        geomBuffer.color = Point4f{ 0.5f, 0, 0.5f, 0.5f };
 
         D3D11_SUBRESOURCE_DATA data;
         data.pSysMem = &geomBuffer;
@@ -1484,8 +1477,12 @@ HRESULT Renderer::InitRect()
         {
             result = SetResourceName(m_pRectGeomBuffer, "RectGeomBuffer");
         }
+
         if (SUCCEEDED(result))
         {
+            geomBuffer.m = DirectX::XMMatrixTranslation(Rect1Pos.x, Rect1Pos.y, Rect1Pos.z);
+            geomBuffer.color = Point4f{ 0.5f, 0.5f, 0, 0.5f };
+
             result = m_pDevice->CreateBuffer(&desc, &data, &m_pRectGeomBuffer2);
         }
         if (SUCCEEDED(result))
@@ -1704,10 +1701,15 @@ void Renderer::RenderRects()
     m_pDeviceContext->PSSetConstantBuffers(0, 2, cbuffers);
     m_pDeviceContext->PSSetShader(m_pRectPixelShader, nullptr, 0);
 
-    Point3f dir, right;
-    m_camera.GetDirections(dir, right);
+    float d0 = 0.0f, d1 = 0.0f;
+    Point3f cameraPos = m_camera.poi + Point3f{ cosf(m_camera.theta) * cosf(m_camera.phi), sinf(m_camera.theta), cosf(m_camera.theta) * sinf(m_camera.phi) } *m_camera.r;
+    for (int i = 0; i < 4; i++)
+    {
+        d0 = std::max(d0, (cameraPos - m_boundingRects[0].v[i]).lengthSqr());
+        d1 = std::max(d1, (cameraPos - m_boundingRects[1].v[i]).lengthSqr());
+    }
 
-    if (dir.x < 0.0)
+    if (d0 > d1)
     {
         cbuffers[1] = m_pRectGeomBuffer;
         m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
