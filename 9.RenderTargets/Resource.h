@@ -11,7 +11,7 @@
 #define IDM_EXIT				105
 #define IDI_MY1WINDOW			107
 #define IDI_SMALL				108
-#define IDC_MY8INSTANCING		109
+#define IDC_MY9RENDERTARGETS	109
 #define IDC_MYICON				2
 #ifndef IDC_STATIC
 #define IDC_STATIC				-1

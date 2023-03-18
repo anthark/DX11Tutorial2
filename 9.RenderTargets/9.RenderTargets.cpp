@@ -2,7 +2,7 @@
 //
 
 #include "framework.h"
-#include "8.Instancing.h"
+#include "9.RenderTargets.h"
 #include "Renderer.h"
 
 #include <windowsx.h>
@@ -43,7 +43,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     // Initialize global strings
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
-    LoadStringW(hInstance, IDC_MY8INSTANCING, szWindowClass, MAX_LOADSTRING);
+    LoadStringW(hInstance, IDC_MY9RENDERTARGETS, szWindowClass, MAX_LOADSTRING);
     MyRegisterClass(hInstance);
 
     // Fix working folder
@@ -64,7 +64,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         return FALSE;
     }
 
-    HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_MY8INSTANCING));
+    HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_MY9RENDERTARGETS));
 
     MSG msg;
 
@@ -118,7 +118,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
     //wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     wcex.hbrBackground = nullptr;
-    wcex.lpszMenuName = MAKEINTRESOURCEW(IDC_MY8INSTANCING);
+    wcex.lpszMenuName = MAKEINTRESOURCEW(IDC_MY9RENDERTARGETS);
     wcex.lpszClassName = szWindowClass;
     wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
 
