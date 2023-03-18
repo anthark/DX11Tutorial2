@@ -933,60 +933,69 @@ HRESULT Renderer::InitScene()
     DXGI_FORMAT textureFmt;
     if (SUCCEEDED(result))
     {
-        const std::wstring TextureName = L"../Common/Brick.dds";
+        TextureDesc textureDesc[2];
+        bool ddsRes = LoadDDS(L"../Common/Brick.dds", textureDesc[0]);
+        if (ddsRes)
+        {
+            ddsRes = LoadDDS(L"../Common/Kitty.dds", textureDesc[1]);
+        }
 
-        TextureDesc textureDesc;
-        bool ddsRes = LoadDDS(TextureName.c_str(), textureDesc);
-
-        textureFmt = textureDesc.fmt;
+        textureFmt = textureDesc[0].fmt;
 
         D3D11_TEXTURE2D_DESC desc = {};
-        desc.Format = textureDesc.fmt;
-        desc.ArraySize = 1;
-        desc.MipLevels = textureDesc.mipmapsCount;
+        desc.Format = textureDesc[0].fmt;
+        desc.ArraySize = 2;
+        desc.MipLevels = textureDesc[0].mipmapsCount;
         desc.Usage = D3D11_USAGE_IMMUTABLE;
         desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
         desc.CPUAccessFlags = 0;
         desc.MiscFlags = 0;
         desc.SampleDesc.Count = 1;
         desc.SampleDesc.Quality = 0;
-        desc.Height = textureDesc.height;
-        desc.Width = textureDesc.width;
-
-        UINT32 blockWidth = DivUp(desc.Width, 4u);
-        UINT32 blockHeight = DivUp(desc.Height, 4u);
-        UINT32 pitch = blockWidth * GetBytesPerBlock(desc.Format);
-        const char* pSrcData = reinterpret_cast<const char*>(textureDesc.pData);
+        desc.Height = textureDesc[0].height;
+        desc.Width = textureDesc[0].width;
 
         std::vector<D3D11_SUBRESOURCE_DATA> data;
-        data.resize(desc.MipLevels);
-        for (UINT32 i = 0; i < desc.MipLevels; i++)
+        data.resize(desc.MipLevels * 2);
+        for (UINT32 j = 0; j < 2; j++)
         {
-            data[i].pSysMem = pSrcData;
-            data[i].SysMemPitch = pitch;
-            data[i].SysMemSlicePitch = 0;
+            UINT32 blockWidth = DivUp(desc.Width, 4u);
+            UINT32 blockHeight = DivUp(desc.Height, 4u);
+            UINT32 pitch = blockWidth * GetBytesPerBlock(desc.Format);
+            const char* pSrcData = reinterpret_cast<const char*>(textureDesc[j].pData);
 
-            pSrcData += pitch * blockHeight;
-            blockHeight = std::max(1u, blockHeight / 2);
-            blockWidth = std::max(1u, blockWidth / 2);
-            pitch = blockWidth * GetBytesPerBlock(desc.Format);
+            for (UINT32 i = 0; i < desc.MipLevels; i++)
+            {
+                data[j * desc.MipLevels + i].pSysMem = pSrcData;
+                data[j * desc.MipLevels + i].SysMemPitch = pitch;
+                data[j * desc.MipLevels + i].SysMemSlicePitch = 0;
+
+                pSrcData += pitch * blockHeight;
+                blockHeight = std::max(1u, blockHeight / 2);
+                blockWidth = std::max(1u, blockWidth / 2);
+                pitch = blockWidth * GetBytesPerBlock(desc.Format);
+            }
         }
         result = m_pDevice->CreateTexture2D(&desc, data.data(), &m_pTexture);
         assert(SUCCEEDED(result));
         if (SUCCEEDED(result))
         {
-            result = SetResourceName(m_pTexture, WCSToMBS(TextureName));
+            result = SetResourceName(m_pTexture, WCSToMBS(L"Diffuse textures"));
         }
-
-        free(textureDesc.pData);
+        for (UINT32 j = 0; j < 2; j++)
+        {
+            free(textureDesc[j].pData);
+        }
     }
     if (SUCCEEDED(result))
     {
         D3D11_SHADER_RESOURCE_VIEW_DESC desc = {};
         desc.Format = textureFmt;
-        desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-        desc.Texture2D.MipLevels = 11;
-        desc.Texture2D.MostDetailedMip = 0;
+        desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
+        desc.Texture2DArray.ArraySize = 2;
+        desc.Texture2DArray.FirstArraySlice = 0;
+        desc.Texture2DArray.MipLevels = 11;
+        desc.Texture2DArray.MostDetailedMip = 0;
 
         result = m_pDevice->CreateShaderResourceView(m_pTexture, &desc, &m_pTextureView);
     }
@@ -1600,11 +1609,21 @@ void Renderer::InitGeom(GeomBuffer& geomBuffer)
 
     geomBuffer.shineSpeedTexIdNM.x = randNormf() > 0.5f ? 64.0f : 0.0f;
     geomBuffer.shineSpeedTexIdNM.y = randNormf() * 2 * (float)M_PI;
-    geomBuffer.shineSpeedTexIdNM.z = 0;
-    int useNM = 1;
-    geomBuffer.shineSpeedTexIdNM.w = *reinterpret_cast<float*>(&useNM);
-
     geomBuffer.posAngle = Point4f{ offset.x, offset.y, offset.z, 0};
+
+    int useNM = 1;
+    bool kitty = randNormf() > 0.5f;
+    if (kitty)
+    {
+        geomBuffer.shineSpeedTexIdNM.z = 1.0f;
+        useNM = 0;
+    }
+    else
+    {
+        geomBuffer.shineSpeedTexIdNM.z = 0.0f;
+        useNM = 1;
+    }
+    geomBuffer.shineSpeedTexIdNM.w = *reinterpret_cast<float*>(&useNM);
 }
 
 void Renderer::TermScene()
