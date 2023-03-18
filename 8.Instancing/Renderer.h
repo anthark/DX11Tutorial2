@@ -9,6 +9,9 @@ class Renderer
 {
     static const double PanSpeed;
 
+    static const Point3f Rect0Pos;
+    static const Point3f Rect1Pos;
+
 public:
     Renderer()
         : m_pDevice(nullptr)
@@ -116,6 +119,11 @@ private:
         Point4f ambientColor;
     };
 
+    struct BoundingRect
+    {
+        Point3f v[4];
+    };
+
 private:
     HRESULT SetupBackBuffer();
     HRESULT InitScene();
@@ -129,7 +137,7 @@ private:
     void RenderSmallSpheres();
     void RenderRects();
 
-    HRESULT CompileAndCreateShader(const std::wstring& path, ID3D11DeviceChild** ppShader, ID3DBlob** ppCode = nullptr);
+    HRESULT CompileAndCreateShader(const std::wstring& path, ID3D11DeviceChild** ppShader, const std::vector<std::string>& defines = {}, ID3DBlob** ppCode = nullptr);
 
 private:
     ID3D11Device* m_pDevice;
@@ -195,6 +203,8 @@ private:
     ID3D11Texture2D* m_pTextureNM;
     ID3D11ShaderResourceView* m_pTextureViewNM;
     ID3D11SamplerState* m_pSampler;
+
+    BoundingRect m_boundingRects[2];
 
     UINT m_width;
     UINT m_height;

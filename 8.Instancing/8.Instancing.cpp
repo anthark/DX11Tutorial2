@@ -41,7 +41,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     // Initialize global strings
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
-    LoadStringW(hInstance, IDC_MY8INSTANCING, szWindowClass, MAX_LOADSTRING);
+    LoadStringW(hInstance, IDC_MY7LIGHTING, szWindowClass, MAX_LOADSTRING);
     MyRegisterClass(hInstance);
 
     // Fix working folder
@@ -62,7 +62,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         return FALSE;
     }
 
-    HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_MY8INSTANCING));
+    HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_MY7LIGHTING));
 
     MSG msg;
 
@@ -116,7 +116,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
     //wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     wcex.hbrBackground = nullptr;
-    wcex.lpszMenuName = MAKEINTRESOURCEW(IDC_MY8INSTANCING);
+    wcex.lpszMenuName = MAKEINTRESOURCEW(IDC_MY7LIGHTING);
     wcex.lpszClassName = szWindowClass;
     wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
 
