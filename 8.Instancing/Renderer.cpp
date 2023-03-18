@@ -91,6 +91,38 @@ void CreateSphere(size_t latCells, size_t lonCells, UINT16* pIndices, Point3f* p
     }
 }
 
+// Build plane equation on 4 points
+Point4f BuildPlane(const Point3f& p0, const Point3f& p1, const Point3f& p2, const Point3f& p3)
+{
+    Point3f norm = (p1 - p0).cross(p3 - p0);
+    norm.normalize();
+    Point3f pos = (p0 + p1 + p2 + p3) * 0.25f;
+
+    return Point4f(norm.x, norm.y, norm.z, -pos.dot(norm));
+}
+
+/** Is box inside? */
+bool IsBoxInside(const Point4f frustum[6], const Point3f& bbMin, const Point3f& bbMax)
+{
+    for (int i = 0; i < 6; i++)
+    {
+        const Point3f norm = frustum[i];
+        Point4f p(
+            signbit(norm.x) ? bbMin.x : bbMax.x,
+            signbit(norm.y) ? bbMin.y : bbMax.y,
+            signbit(norm.z) ? bbMin.z : bbMax.z,
+            1.0f
+        );
+        float s = p.dot(frustum[i]);
+        if (s < 0.0f)
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 }
 
 void Renderer::Camera::GetDirections(Point3f& forward, Point3f& right)
@@ -204,8 +236,11 @@ bool Renderer::Init(HWND hWnd)
     {
         m_camera.poi = Point3f{ 0,0,0 };
         m_camera.r = 5.0f;
-        m_camera.phi = -(float)M_PI/4;
-        m_camera.theta = (float)M_PI/4;
+        // AAV TEMP
+        //m_camera.phi = -(float)M_PI/4;
+        //m_camera.theta = (float)M_PI/4;
+        m_camera.phi = 0.0f;
+        m_camera.theta = 0.0f;
     }
 
     SAFE_RELEASE(pSelectedAdapter);
@@ -383,6 +418,8 @@ bool Renderer::Render()
 
     m_pDeviceContext->OMSetBlendState(m_pOpaqueBlendState, nullptr, 0xFFFFFFFF);
 
+    CullBoxes();
+
     ID3D11SamplerState* samplers[] = {m_pSampler};
     m_pDeviceContext->PSSetSamplers(0, 1, samplers);
 
@@ -393,15 +430,22 @@ bool Renderer::Render()
     ID3D11Buffer* vertexBuffers[] = {m_pVertexBuffer};
     UINT strides[] = {44};
     UINT offsets[] = {0};
-    ID3D11Buffer* cbuffers[] = {m_pSceneBuffer, m_pGeomBufferInst};
+    ID3D11Buffer* cbuffers[] = {m_pSceneBuffer, m_pGeomBufferInst, m_pGeomBufferInstVis};
     m_pDeviceContext->IASetVertexBuffers(0, 1, vertexBuffers, strides, offsets);
     m_pDeviceContext->IASetInputLayout(m_pInputLayout);
     m_pDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     m_pDeviceContext->VSSetShader(m_pVertexShader, nullptr, 0);
-    m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
-    m_pDeviceContext->PSSetConstantBuffers(0, 2, cbuffers);
+    m_pDeviceContext->VSSetConstantBuffers(0, 3, cbuffers);
+    m_pDeviceContext->PSSetConstantBuffers(0, 3, cbuffers);
     m_pDeviceContext->PSSetShader(m_pPixelShader, nullptr, 0);
-    m_pDeviceContext->DrawIndexedInstanced(36, m_instCount, 0, 0, 0);
+    if (m_doCull)
+    {
+        m_pDeviceContext->DrawIndexedInstanced(36, m_visibleInstances, 0, 0, 0);
+    }
+    else
+    {
+        m_pDeviceContext->DrawIndexedInstanced(36, m_instCount, 0, 0, 0);
+    }
 
     if (m_showLightBulbs)
     {
@@ -426,6 +470,7 @@ bool Renderer::Render()
 
         m_sceneBuffer.lightCount.y = m_useNormalMaps ? 1 : 0;
         m_sceneBuffer.lightCount.z = m_showNormals ? 1 : 0;
+        m_sceneBuffer.lightCount.w = m_doCull ? 1 : 0;
 
         bool add = ImGui::Button("+");
         ImGui::SameLine();
@@ -458,13 +503,15 @@ bool Renderer::Render()
         ImGui::SameLine();
         remove = ImGui::Button("-");
         ImGui::Text("Count %d", m_instCount);
+        ImGui::Text("Visible %d", m_visibleInstances);
+        ImGui::Checkbox("Cull", &m_doCull);
         ImGui::End();
         if (add && m_instCount < MaxInst)
         {
             Point4f pos = m_geomBuffers[m_instCount].posAngle;
             if (pos.x == 0 && pos.y == 0 && pos.z == 0)
             {
-                InitGeom(m_geomBuffers[m_instCount]);
+                InitGeom(m_geomBuffers[m_instCount], m_geomBBs[m_instCount]);
             }
             ++m_instCount;
         }
@@ -797,12 +844,16 @@ HRESULT Renderer::InitScene()
         }
         if (SUCCEEDED(result))
         {
+            const float diag = sqrtf(2.0f) / 2.0f * 0.5f;
+
             m_geomBuffers[0].shineSpeedTexIdNM.x = 0.0f;
             m_geomBuffers[0].shineSpeedTexIdNM.y = ModelRotationSpeed;
             m_geomBuffers[0].shineSpeedTexIdNM.z = 0.0f;
             int useNM = 1;
             m_geomBuffers[0].shineSpeedTexIdNM.w = *reinterpret_cast<float*>(&useNM);
             m_geomBuffers[0].posAngle = Point4f{ 0.00001f, 0, 0, 0 };
+            m_geomBBs[0].vmin = m_geomBuffers[0].posAngle + Point3f{ -diag, -0.5f, -diag };
+            m_geomBBs[0].vmax = m_geomBuffers[0].posAngle + Point3f{ diag,  0.5f,  diag };
 
             m_geomBuffers[1].shineSpeedTexIdNM.x = 64.0f;
             m_geomBuffers[1].shineSpeedTexIdNM.y = 0.0f;
@@ -817,12 +868,32 @@ HRESULT Renderer::InitScene()
             m = DirectX::XMMatrixInverse(nullptr, m);
             m = DirectX::XMMatrixTranspose(m);
             m_geomBuffers[1].normalM = m;
+            m_geomBBs[1].vmin = m_geomBuffers[1].posAngle + Point3f{ -0.5f, -0.5f, -0.5f };
+            m_geomBBs[1].vmax = m_geomBuffers[1].posAngle + Point3f{ 0.5f, 0.5f, 0.5f };
 
             for (int i = 2; i < 10; i++)
             {
-                InitGeom(m_geomBuffers[i]);
+                InitGeom(m_geomBuffers[i], m_geomBBs[i]);
             }
             m_instCount = 10;
+        }
+    }
+    // Create geometry visibility buffer
+    if (SUCCEEDED(result))
+    {
+        D3D11_BUFFER_DESC desc = {};
+        desc.ByteWidth = sizeof(Point4i) * MaxInst;
+        desc.Usage = D3D11_USAGE_DYNAMIC;
+        desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+        desc.MiscFlags = 0;
+        desc.StructureByteStride = 0;
+
+        result = m_pDevice->CreateBuffer(&desc, nullptr, &m_pGeomBufferInstVis);
+        assert(SUCCEEDED(result));
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pGeomBufferInstVis, "GeomBufferInstVis");
         }
     }
     // Create scene buffer
@@ -1380,11 +1451,22 @@ HRESULT Renderer::InitRect()
         0, 2, 3
     };
 
-    for (int i = 0; i < 4; i++)
+    for (int j = 0; j < 2; j++)
     {
-        m_boundingRects[0].v[i] = Point3f{ Vertices[i].x, Vertices[i].y, Vertices[i].z } + Rect0Pos;
-        m_boundingRects[1].v[i] = Point3f{ Vertices[i].x, Vertices[i].y, Vertices[i].z } + Rect1Pos;
+        for (int i = 0; i < 4; i++)
+        {
+            m_boundingRects[j].vmin.x = std::min(m_boundingRects[j].vmin.x, Vertices[i].x);
+            m_boundingRects[j].vmin.y = std::min(m_boundingRects[j].vmin.y, Vertices[i].y);
+            m_boundingRects[j].vmin.z = std::min(m_boundingRects[j].vmin.z, Vertices[i].z);
+            m_boundingRects[j].vmax.x = std::max(m_boundingRects[j].vmax.x, Vertices[i].x);
+            m_boundingRects[j].vmax.y = std::max(m_boundingRects[j].vmax.y, Vertices[i].y);
+            m_boundingRects[j].vmax.z = std::max(m_boundingRects[j].vmax.z, Vertices[i].z);
+        }
     }
+    m_boundingRects[0].vmin = m_boundingRects[0].vmin + Rect0Pos;
+    m_boundingRects[1].vmin = m_boundingRects[1].vmin + Rect0Pos;
+    m_boundingRects[1].vmin = m_boundingRects[1].vmin + Rect1Pos;
+    m_boundingRects[1].vmax = m_boundingRects[1].vmax + Rect1Pos;
 
     HRESULT result = S_OK;
 
@@ -1603,13 +1685,17 @@ void Renderer::UpdateCubes(double deltaSec)
     }
 }
 
-void Renderer::InitGeom(GeomBuffer& geomBuffer)
+void Renderer::InitGeom(GeomBuffer& geomBuffer, AABB& bb)
 {
     Point3f offset = Point3f{ randNormf(), randNormf(), randNormf() } *7.0f - Point3f{ 3.5f, 3.5f, 3.5f };
 
     geomBuffer.shineSpeedTexIdNM.x = randNormf() > 0.5f ? 64.0f : 0.0f;
     geomBuffer.shineSpeedTexIdNM.y = randNormf() * 2 * (float)M_PI;
     geomBuffer.posAngle = Point4f{ offset.x, offset.y, offset.z, 0};
+
+    const float diag = sqrtf(2.0f) / 2.0f * 0.5f;
+    bb.vmin = geomBuffer.posAngle + Point3f{-diag, -0.5f, -diag};
+    bb.vmax = geomBuffer.posAngle + Point3f{ diag,  0.5f,  diag};
 
     int useNM = 1;
     bool kitty = randNormf() > 0.5f;
@@ -1648,6 +1734,7 @@ void Renderer::TermScene()
 
     SAFE_RELEASE(m_pSceneBuffer);
     SAFE_RELEASE(m_pGeomBufferInst);
+    SAFE_RELEASE(m_pGeomBufferInstVis);
 
     SAFE_RELEASE(m_pTransBlendState);
     SAFE_RELEASE(m_pOpaqueBlendState);
@@ -1759,10 +1846,10 @@ void Renderer::RenderRects()
 
     float d0 = 0.0f, d1 = 0.0f;
     Point3f cameraPos = m_camera.poi + Point3f{ cosf(m_camera.theta) * cosf(m_camera.phi), sinf(m_camera.theta), cosf(m_camera.theta) * sinf(m_camera.phi) } *m_camera.r;
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < 8; i++)
     {
-        d0 = std::max(d0, (cameraPos - m_boundingRects[0].v[i]).lengthSqr());
-        d1 = std::max(d1, (cameraPos - m_boundingRects[1].v[i]).lengthSqr());
+        d0 = std::max(d0, (cameraPos - m_boundingRects[0].GetVert(i)).lengthSqr());
+        d1 = std::max(d1, (cameraPos - m_boundingRects[1].GetVert(i)).lengthSqr());
     }
 
     if (d0 > d1)
@@ -1788,6 +1875,67 @@ void Renderer::RenderRects()
         m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
         m_pDeviceContext->PSSetConstantBuffers(0, 2, cbuffers);
         m_pDeviceContext->DrawIndexed(6, 0, 0);
+    }
+}
+
+void Renderer::CullBoxes()
+{
+    Point3f dir = -Point3f{ cosf(m_camera.theta) * cosf(m_camera.phi), sinf(m_camera.theta), cosf(m_camera.theta) * sinf(m_camera.phi) };
+    float upTheta = m_camera.theta + (float)M_PI / 2;
+    Point3f up = Point3f{ cosf(upTheta) * cosf(m_camera.phi), sinf(upTheta), cosf(upTheta) * sinf(m_camera.phi) };
+    Point3f right = up.cross(dir);
+    Point3f pos = m_camera.poi + Point3f{ cosf(m_camera.theta) * cosf(m_camera.phi), sinf(m_camera.theta), cosf(m_camera.theta) * sinf(m_camera.phi) } *m_camera.r;
+
+    float f = 100.0f;
+    float n = 0.1f;
+    float fov = (float)M_PI / 3;
+
+    float x = tanf(fov * 0.5f) * n;
+    float y = tanf(fov * 0.5f) * n * (float)m_height / m_width;
+
+    Point3f nearVertices[4];
+    nearVertices[0] = pos + dir * n - up * y - right * x;
+    nearVertices[1] = pos + dir * n - up * y + right * x;
+    nearVertices[2] = pos + dir * n + up * y + right * x;
+    nearVertices[3] = pos + dir * n + up * y - right * x;
+
+    x = tanf(fov * 0.5f) * f;
+    y = tanf(fov * 0.5f) * f * (float)m_height / m_width;
+
+    Point3f farVertices[4];
+    farVertices[0] = pos + dir * f - up * y - right * x;
+    farVertices[1] = pos + dir * f - up * y + right * x;
+    farVertices[2] = pos + dir * f + up * y + right * x;
+    farVertices[3] = pos + dir * f + up * y - right * x;
+
+    Point4f frustum[6];
+
+    frustum[0] = BuildPlane(nearVertices[0], nearVertices[1], nearVertices[2], nearVertices[3]);
+    frustum[1] = BuildPlane(nearVertices[0], farVertices[0], farVertices[1], nearVertices[1]);
+    frustum[2] = BuildPlane(nearVertices[1], farVertices[1], farVertices[2], nearVertices[2]);
+    frustum[3] = BuildPlane(nearVertices[2], farVertices[2], farVertices[3], nearVertices[3]);
+    frustum[4] = BuildPlane(nearVertices[3], farVertices[3], farVertices[0], nearVertices[0]);
+    frustum[5] = BuildPlane(farVertices[1], farVertices[0], farVertices[3], farVertices[2]);
+
+    std::vector<Point4i> ids(MaxInst);
+
+    m_visibleInstances = 0;
+    for (UINT i = 0; i < m_instCount; i++)
+    {
+        if (IsBoxInside(frustum, m_geomBBs[i].vmin, m_geomBBs[i].vmax))
+        {
+            ids[m_visibleInstances].x = i;
+            ++m_visibleInstances;
+        }
+    }
+
+    D3D11_MAPPED_SUBRESOURCE subresource;
+    HRESULT hr = m_pDeviceContext->Map(m_pGeomBufferInstVis, 0, D3D11_MAP_WRITE_DISCARD, 0, &subresource);
+    assert(SUCCEEDED(hr));
+    if (SUCCEEDED(hr))
+    {
+        memcpy(subresource.pData, ids.data(), sizeof(Point4i) * m_visibleInstances);
+        m_pDeviceContext->Unmap(m_pGeomBufferInstVis, 0);
     }
 }
 

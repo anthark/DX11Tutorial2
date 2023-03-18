@@ -27,6 +27,7 @@ public:
         , m_width(16)
         , m_height(16)
         , m_pGeomBufferInst(nullptr)
+        , m_pGeomBufferInstVis(nullptr)
         , m_pSceneBuffer(nullptr)
         , m_pVertexBuffer(nullptr)
         , m_pIndexBuffer(nullptr)
@@ -74,8 +75,11 @@ public:
         , m_showLightBulbs(true)
         , m_useNormalMaps(true)
         , m_showNormals(false)
+        , m_doCull(true)
         , m_geomBuffers(MaxInst)
+        , m_geomBBs(MaxInst)
         , m_instCount(2)
+        , m_visibleInstances(0)
     {
         for (int i = 0; i < 10; i++)
         {
@@ -117,14 +121,29 @@ private:
     {
         DirectX::XMMATRIX vp;
         Point4f cameraPos;
-        Point4i lightCount; // x - light count (max 10)
+        Point4i lightCount; // x - light count (max 10), y - use normal maps, z - show normals, w - do culling
         Light lights[10];
         Point4f ambientColor;
     };
 
-    struct BoundingRect
+    struct AABB
     {
-        Point3f v[4];
+        Point3f vmin = Point3f{
+            std::numeric_limits<float>::max(), std::numeric_limits<float>::max(), std::numeric_limits<float>::max()
+        };
+        Point3f vmax = Point3f{
+            std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest()
+        };
+
+        inline Point3f GetVert(int idx) const
+        {
+            return Point3f
+            {
+                (idx & 1) == 0 ? vmin.x : vmax.x,
+                (idx & 2) == 0 ? vmin.y : vmax.y,
+                (idx & 4) == 0 ? vmin.z : vmax.z
+            };
+        }
     };
 
     struct GeomBuffer
@@ -145,13 +164,15 @@ private:
 
     void UpdateCubes(double deltaSec);
 
-    void InitGeom(GeomBuffer& geomBuffer);
+    void InitGeom(GeomBuffer& geomBuffer, AABB& bb);
 
     void TermScene();
 
     void RenderSphere();
     void RenderSmallSpheres();
     void RenderRects();
+
+    void CullBoxes();
 
     HRESULT CompileAndCreateShader(const std::wstring& path, ID3D11DeviceChild** ppShader, const std::vector<std::string>& defines = {}, ID3DBlob** ppCode = nullptr);
 
@@ -172,13 +193,16 @@ private:
 
     // For cubes
     ID3D11Buffer* m_pGeomBufferInst;
+    ID3D11Buffer* m_pGeomBufferInstVis;
     ID3D11Buffer* m_pVertexBuffer;
     ID3D11Buffer* m_pIndexBuffer;
     ID3D11PixelShader* m_pPixelShader;
     ID3D11VertexShader* m_pVertexShader;
     ID3D11InputLayout* m_pInputLayout;
     std::vector<GeomBuffer> m_geomBuffers;
+    std::vector<AABB> m_geomBBs;
     UINT m_instCount;
+    UINT m_visibleInstances;
 
     // For sphere
     ID3D11Buffer* m_pSphereGeomBuffer;
@@ -221,7 +245,7 @@ private:
     ID3D11ShaderResourceView* m_pTextureViewNM;
     ID3D11SamplerState* m_pSampler;
 
-    BoundingRect m_boundingRects[2];
+    AABB m_boundingRects[2];
 
     UINT m_width;
     UINT m_height;
@@ -238,6 +262,7 @@ private:
     bool m_showLightBulbs;
     bool m_useNormalMaps;
     bool m_showNormals;
+    bool m_doCull;
 
     size_t m_prevUSec;
 

@@ -13,6 +13,11 @@ cbuffer GeomBufferInst : register (b1)
     GeomBuffer geomBuffer[100];
 };
 
+cbuffer GeomBufferInstVis : register (b2)
+{
+    uint4 ids[100];
+};
+
 Texture2DArray colorTexture : register (t0);
 Texture2D normalMapTexture : register (t1);
 
@@ -31,7 +36,7 @@ struct VSOutput
 
 float4 ps(VSOutput pixel) : SV_Target0
 {
-    unsigned int idx = pixel.instanceId;
+    unsigned int idx = lightCount.w == 1 ? ids[pixel.instanceId].x : pixel.instanceId;
     unsigned int flags = asuint(geomBuffer[idx].shineSpeedTexIdNM.w);
 
     float3 color = colorTexture.Sample(colorSampler, float3(pixel.uv, geomBuffer[idx].shineSpeedTexIdNM.z)).xyz;

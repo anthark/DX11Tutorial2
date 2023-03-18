@@ -5,12 +5,17 @@ struct GeomBuffer
     float4x4 model;
     float4x4 norm;
     float4 shineSpeedTexIdNM; // x - shininess, y - rotation speed, z - texture id, w - normal map presence
-    float4 angle; // x - current angle
+    float4 posAngle; // xyz - position, w - current angle
 };
 
 cbuffer GeomBufferInst : register (b1)
 {
     GeomBuffer geomBuffer[100];
+};
+
+cbuffer GeomBufferInstVis : register (b2)
+{
+    uint4 ids[100];
 };
 
 struct VSInput
@@ -38,7 +43,7 @@ VSOutput vs(VSInput vertex)
 {
     VSOutput result;
 
-    unsigned int idx = vertex.instanceId;
+    unsigned int idx = lightCount.w == 1 ? ids[vertex.instanceId].x : vertex.instanceId;
 
     float4 worldPos = mul(geomBuffer[idx].model, float4(vertex.pos, 1.0));
 
