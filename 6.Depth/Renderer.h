@@ -9,6 +9,9 @@ class Renderer
 {
     static const double PanSpeed;
 
+    static const Point3f Rect0Pos;
+    static const Point3f Rect1Pos;
+
 public:
     Renderer()
         : m_pDevice(nullptr)
@@ -85,6 +88,11 @@ private:
         void GetDirections(Point3f& forward, Point3f& right);
     };
 
+    struct BoundingRect
+    {
+        Point3f v[4];
+    };
+
 private:
     HRESULT SetupBackBuffer();
     HRESULT InitScene();
@@ -151,6 +159,8 @@ private:
     ID3D11Texture2D* m_pTexture;
     ID3D11ShaderResourceView* m_pTextureView;
     ID3D11SamplerState* m_pSampler;
+
+    BoundingRect m_boundingRects[2];
 
     UINT m_width;
     UINT m_height;

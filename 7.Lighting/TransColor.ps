@@ -1,6 +1,9 @@
+#include "Light.h"
+
 struct VSOutput
 {
     float4 pos : SV_Position;
+    float3 worldPos : POSITION;
 };
 
 cbuffer GeomBuffer : register (b1)
@@ -11,5 +14,9 @@ cbuffer GeomBuffer : register (b1)
 
 float4 ps(VSOutput pixel) : SV_Target0
 {
+#ifdef USE_LIGHTS
+    return float4(CalculateColor(color.xyz, float3(1,0,0), pixel.worldPos.xyz, 0.0, true), color.w);
+#else
     return color;
+#endif // !USE_LIGHTS
 }
