@@ -1969,7 +1969,7 @@ void Renderer::RenderPostProcess()
     m_pDeviceContext->VSSetShader(m_pSepiaVertexShader, nullptr, 0);
     m_pDeviceContext->PSSetShader(m_pSepiaPixelShader, nullptr, 0);
 
-    m_pDeviceContext->Draw(6, 0);
+    m_pDeviceContext->Draw(3, 0);
 }
 
 void Renderer::CullBoxes()

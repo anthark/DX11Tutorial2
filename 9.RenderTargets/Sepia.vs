@@ -17,23 +17,13 @@ VSOutput vs(VSInput vertex)
     switch (vertex.vertexId)
     {
         case 0:
-            pos = float4(-1,-1,0,1);
-            break;
-        case 1:
-            pos = float4(1,1,0,1);
-            break;
-        case 2:
-            pos = float4(1,-1,0,1);
-            break;
-
-        case 3:
-            pos = float4(-1,-1,0,1);
-            break;
-        case 4:
             pos = float4(-1,1,0,1);
             break;
-        case 5:
-            pos = float4(1,1,0,1);
+        case 1:
+            pos = float4(3,1,0,1);
+            break;
+        case 2:
+            pos = float4(-1,-3,0,1);
             break;
     }
 
