@@ -401,7 +401,7 @@ bool Renderer::Render()
     m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
     m_pDeviceContext->PSSetConstantBuffers(0, 2, cbuffers);
     m_pDeviceContext->PSSetShader(m_pPixelShader, nullptr, 0);
-    m_pDeviceContext->DrawIndexedInstanced(36, 2, 0, 0, 0);
+    m_pDeviceContext->DrawIndexedInstanced(36, m_instCount, 0, 0, 0);
 
     if (m_showLightBulbs)
     {
@@ -452,6 +452,26 @@ bool Renderer::Render()
         }
 
         ImGui::End();
+
+        ImGui::Begin("Instances");
+        add = ImGui::Button("+");
+        ImGui::SameLine();
+        remove = ImGui::Button("-");
+        ImGui::Text("Count %d", m_instCount);
+        ImGui::End();
+        if (add && m_instCount < MaxInst)
+        {
+            Point4f pos = m_geomBuffers[m_instCount].posAngle;
+            if (pos.x == 0 && pos.y == 0 && pos.z == 0)
+            {
+                InitGeom(m_geomBuffers[m_instCount]);
+            }
+            ++m_instCount;
+        }
+        if (remove && m_instCount > 0)
+        {
+            --m_instCount;
+        }
     }
 
     // Rendering
@@ -777,11 +797,32 @@ HRESULT Renderer::InitScene()
         }
         if (SUCCEEDED(result))
         {
-            m_geomBuffers[0].shine = 0.0f;
+            m_geomBuffers[0].shineSpeedTexIdNM.x = 0.0f;
+            m_geomBuffers[0].shineSpeedTexIdNM.y = ModelRotationSpeed;
+            m_geomBuffers[0].shineSpeedTexIdNM.z = 0.0f;
+            int useNM = 1;
+            m_geomBuffers[0].shineSpeedTexIdNM.w = *reinterpret_cast<float*>(&useNM);
+            m_geomBuffers[0].posAngle = Point4f{ 0.00001f, 0, 0, 0 };
 
-            m_geomBuffers[1].m = DirectX::XMMatrixTranslation(2.0f, 0, 0);
-            m_geomBuffers[1].normalM = DirectX::XMMatrixIdentity();
-            m_geomBuffers[1].shine = 64.0f;
+            m_geomBuffers[1].shineSpeedTexIdNM.x = 64.0f;
+            m_geomBuffers[1].shineSpeedTexIdNM.y = 0.0f;
+            m_geomBuffers[1].shineSpeedTexIdNM.z = 0.0f;
+            m_geomBuffers[1].shineSpeedTexIdNM.w = *reinterpret_cast<float*>(&useNM);
+            m_geomBuffers[1].posAngle = Point4f{ 2.0f, 0, 0, 0 };
+            DirectX::XMMATRIX m = DirectX::XMMatrixMultiply(
+                DirectX::XMMatrixRotationAxis(DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f), -(float)m_geomBuffers[1].posAngle.w),
+                DirectX::XMMatrixTranslation(m_geomBuffers[1].posAngle.x, m_geomBuffers[1].posAngle.y, m_geomBuffers[1].posAngle.z)
+            );
+            m_geomBuffers[1].m = m;
+            m = DirectX::XMMatrixInverse(nullptr, m);
+            m = DirectX::XMMatrixTranspose(m);
+            m_geomBuffers[1].normalM = m;
+
+            for (int i = 2; i < 10; i++)
+            {
+                InitGeom(m_geomBuffers[i]);
+            }
+            m_instCount = 10;
         }
     }
     // Create scene buffer
@@ -1529,19 +1570,41 @@ void Renderer::UpdateCubes(double deltaSec)
 {
     if (m_rotateModel)
     {
-        m_angle = m_angle + deltaSec * ModelRotationSpeed;
+        for (UINT i = 0; i < m_instCount; i++)
+        {
+            if (fabs(m_geomBuffers[i].shineSpeedTexIdNM.y) > 0.0001)
+            {
+                m_geomBuffers[i].posAngle.w = m_geomBuffers[i].posAngle.w + (float)deltaSec * m_geomBuffers[i].shineSpeedTexIdNM.y;
 
-        // Model matrix
-        // Angle is reversed, as DirectXMath calculates it as clockwise
-        DirectX::XMMATRIX m = DirectX::XMMatrixRotationAxis(DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f), -(float)m_angle);
+                // Model matrix
+                // Angle is reversed, as DirectXMath calculates it as clockwise
+                DirectX::XMMATRIX m =DirectX::XMMatrixMultiply(
+                    DirectX::XMMatrixRotationAxis(DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f), -(float)m_geomBuffers[i].posAngle.w),
+                    DirectX::XMMatrixTranslation(m_geomBuffers[i].posAngle.x, m_geomBuffers[i].posAngle.y, m_geomBuffers[i].posAngle.z)
+                );
 
-        m_geomBuffers[0].m = m;
-        m = DirectX::XMMatrixInverse(nullptr, m);
-        m = DirectX::XMMatrixTranspose(m);
-        m_geomBuffers[0].normalM = m;
+                m_geomBuffers[i].m = m;
+                m = DirectX::XMMatrixInverse(nullptr, m);
+                m = DirectX::XMMatrixTranspose(m);
+                m_geomBuffers[i].normalM = m;
+            }
+        }
 
         m_pDeviceContext->UpdateSubresource(m_pGeomBufferInst, 0, nullptr, m_geomBuffers.data(), 0, 0);
     }
+}
+
+void Renderer::InitGeom(GeomBuffer& geomBuffer)
+{
+    Point3f offset = Point3f{ randNormf(), randNormf(), randNormf() } *7.0f - Point3f{ 3.5f, 3.5f, 3.5f };
+
+    geomBuffer.shineSpeedTexIdNM.x = randNormf() > 0.5f ? 64.0f : 0.0f;
+    geomBuffer.shineSpeedTexIdNM.y = randNormf() * 2 * (float)M_PI;
+    geomBuffer.shineSpeedTexIdNM.z = 0;
+    int useNM = 1;
+    geomBuffer.shineSpeedTexIdNM.w = *reinterpret_cast<float*>(&useNM);
+
+    geomBuffer.posAngle = Point4f{ offset.x, offset.y, offset.z, 0};
 }
 
 void Renderer::TermScene()

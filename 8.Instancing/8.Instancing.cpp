@@ -37,6 +37,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
 
+    srand(12345);
+
     // TODO: Place code here.
 
     // Initialize global strings

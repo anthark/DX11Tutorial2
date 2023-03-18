@@ -4,7 +4,8 @@ struct GeomBuffer
 {
     float4x4 model;
     float4x4 norm;
-    float4 shine; // x - shininess
+    float4 shineSpeedTexIdNM; // x - shininess, y - rotation speed, z - texture id, w - normal map presence
+    float4 angle; // x - current angle
 };
 
 cbuffer GeomBufferInst : register (b1)

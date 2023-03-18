@@ -131,7 +131,8 @@ private:
     {
         DirectX::XMMATRIX m;
         DirectX::XMMATRIX normalM;
-        Point4f shine; // x - shininess
+        Point4f shineSpeedTexIdNM; // x - shininess, y - rotation speed, z - texture id, w - normal map presence
+        Point4f posAngle; // xyz - position, w - current angle
     };
 
 private:
@@ -143,6 +144,8 @@ private:
     HRESULT InitCubemap();
 
     void UpdateCubes(double deltaSec);
+
+    void InitGeom(GeomBuffer& geomBuffer);
 
     void TermScene();
 
@@ -175,7 +178,7 @@ private:
     ID3D11VertexShader* m_pVertexShader;
     ID3D11InputLayout* m_pInputLayout;
     std::vector<GeomBuffer> m_geomBuffers;
-    size_t m_instCount;
+    UINT m_instCount;
 
     // For sphere
     ID3D11Buffer* m_pSphereGeomBuffer;
