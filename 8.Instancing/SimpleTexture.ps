@@ -1,10 +1,15 @@
 #include "Light.h"
 
-cbuffer GeomBuffer : register (b1)
+struct GeomBuffer
 {
     float4x4 model;
     float4x4 norm;
     float4 shine; // x - shininess
+};
+
+cbuffer GeomBufferInst : register (b1)
+{
+    GeomBuffer geomBuffer[100];
 };
 
 Texture2D colorTexture : register (t0);
@@ -19,6 +24,8 @@ struct VSOutput
     float3 tang : TANGENT;
     float3 norm : NORMAL;
     float2 uv : TEXCOORD;
+
+    nointerpolation unsigned int instanceId : SV_InstanceID;
 };
 
 float4 ps(VSOutput pixel) : SV_Target0
@@ -38,5 +45,7 @@ float4 ps(VSOutput pixel) : SV_Target0
         normal = pixel.norm;
     }
 
-    return float4(CalculateColor(color, normal, pixel.worldPos.xyz, shine.x, false), 1.0);
+    unsigned int idx = pixel.instanceId;
+
+    return float4(CalculateColor(color, normal, pixel.worldPos.xyz, geomBuffer[idx].shine.x, false), 1.0);
 }

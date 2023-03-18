@@ -30,13 +30,6 @@ struct ColorVertex
     COLORREF color;
 };
 
-struct GeomBuffer
-{
-    DirectX::XMMATRIX m;
-    DirectX::XMMATRIX normalM;
-    Point4f shine; // x - shininess
-};
-
 struct SphereGeomBuffer
 {
     DirectX::XMMATRIX m;
@@ -301,31 +294,7 @@ bool Renderer::Update()
         m_camera.poi = m_camera.poi + d;
     }
 
-    if (m_rotateModel)
-    {
-        m_angle = m_angle + deltaSec * ModelRotationSpeed;
-
-        GeomBuffer geomBuffer;
-
-        // Model matrix
-        // Angle is reversed, as DirectXMath calculates it as clockwise
-        DirectX::XMMATRIX m = DirectX::XMMatrixRotationAxis(DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f), -(float)m_angle);
-
-        geomBuffer.m = m;
-        m = DirectX::XMMatrixInverse(nullptr, m);
-        m = DirectX::XMMatrixTranspose(m);
-        geomBuffer.normalM = m;
-        geomBuffer.shine.x = 0.0f;
-
-        m_pDeviceContext->UpdateSubresource(m_pGeomBuffer, 0, nullptr, &geomBuffer, 0, 0);
-
-        // Model matrix for second cube
-        m = DirectX::XMMatrixTranslation(2.0f, 0.0f, 0.0f);
-        geomBuffer.m = m;
-        geomBuffer.normalM = DirectX::XMMatrixIdentity();
-        geomBuffer.shine.x = 64.0f;
-        m_pDeviceContext->UpdateSubresource(m_pGeomBuffer2, 0, nullptr, &geomBuffer, 0, 0);
-    }
+    UpdateCubes(deltaSec);
 
     // Move light bulb spheres
     {
@@ -424,7 +393,7 @@ bool Renderer::Render()
     ID3D11Buffer* vertexBuffers[] = {m_pVertexBuffer};
     UINT strides[] = {44};
     UINT offsets[] = {0};
-    ID3D11Buffer* cbuffers[] = {m_pSceneBuffer, m_pGeomBuffer};
+    ID3D11Buffer* cbuffers[] = {m_pSceneBuffer, m_pGeomBufferInst};
     m_pDeviceContext->IASetVertexBuffers(0, 1, vertexBuffers, strides, offsets);
     m_pDeviceContext->IASetInputLayout(m_pInputLayout);
     m_pDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -432,12 +401,7 @@ bool Renderer::Render()
     m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
     m_pDeviceContext->PSSetConstantBuffers(0, 2, cbuffers);
     m_pDeviceContext->PSSetShader(m_pPixelShader, nullptr, 0);
-    m_pDeviceContext->DrawIndexed(36, 0, 0);
-
-    ID3D11Buffer* cbuffers2[] = { m_pGeomBuffer2 };
-    m_pDeviceContext->VSSetConstantBuffers(1, 1, cbuffers2);
-    m_pDeviceContext->PSSetConstantBuffers(1, 1, cbuffers2);
-    m_pDeviceContext->DrawIndexed(36, 0, 0);
+    m_pDeviceContext->DrawIndexedInstanced(36, 2, 0, 0, 0);
 
     if (m_showLightBulbs)
     {
@@ -798,35 +762,26 @@ HRESULT Renderer::InitScene()
     if (SUCCEEDED(result))
     {
         D3D11_BUFFER_DESC desc = {};
-        desc.ByteWidth = sizeof(GeomBuffer);
+        desc.ByteWidth = sizeof(GeomBuffer) * MaxInst;
         desc.Usage = D3D11_USAGE_DEFAULT;
         desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
         desc.CPUAccessFlags = 0;
         desc.MiscFlags = 0;
         desc.StructureByteStride = 0;
 
-        GeomBuffer geomBuffer;
-        geomBuffer.m = DirectX::XMMatrixIdentity();
-
-        D3D11_SUBRESOURCE_DATA data;
-        data.pSysMem = &geomBuffer;
-        data.SysMemPitch = sizeof(geomBuffer);
-        data.SysMemSlicePitch = 0;
-
-        result = m_pDevice->CreateBuffer(&desc, &data, &m_pGeomBuffer);
+        result = m_pDevice->CreateBuffer(&desc, nullptr, &m_pGeomBufferInst);
         assert(SUCCEEDED(result));
         if (SUCCEEDED(result))
         {
-            result = SetResourceName(m_pGeomBuffer, "GeomBuffer");
+            result = SetResourceName(m_pGeomBufferInst, "GeomBufferInst");
         }
         if (SUCCEEDED(result))
         {
-            result = m_pDevice->CreateBuffer(&desc, &data, &m_pGeomBuffer2);
-            assert(SUCCEEDED(result));
-            if (SUCCEEDED(result))
-            {
-                result = SetResourceName(m_pGeomBuffer2, "GeomBuffer2");
-            }
+            m_geomBuffers[0].shine = 0.0f;
+
+            m_geomBuffers[1].m = DirectX::XMMatrixTranslation(2.0f, 0, 0);
+            m_geomBuffers[1].normalM = DirectX::XMMatrixIdentity();
+            m_geomBuffers[1].shine = 64.0f;
         }
     }
     // Create scene buffer
@@ -1570,6 +1525,25 @@ HRESULT Renderer::InitCubemap()
     return result;
 }
 
+void Renderer::UpdateCubes(double deltaSec)
+{
+    if (m_rotateModel)
+    {
+        m_angle = m_angle + deltaSec * ModelRotationSpeed;
+
+        // Model matrix
+        // Angle is reversed, as DirectXMath calculates it as clockwise
+        DirectX::XMMATRIX m = DirectX::XMMatrixRotationAxis(DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f), -(float)m_angle);
+
+        m_geomBuffers[0].m = m;
+        m = DirectX::XMMatrixInverse(nullptr, m);
+        m = DirectX::XMMatrixTranspose(m);
+        m_geomBuffers[0].normalM = m;
+
+        m_pDeviceContext->UpdateSubresource(m_pGeomBufferInst, 0, nullptr, m_geomBuffers.data(), 0, 0);
+    }
+}
+
 void Renderer::TermScene()
 {
     SAFE_RELEASE(m_pSampler);
@@ -1591,8 +1565,7 @@ void Renderer::TermScene()
     SAFE_RELEASE(m_pVertexBuffer);
 
     SAFE_RELEASE(m_pSceneBuffer);
-    SAFE_RELEASE(m_pGeomBuffer);
-    SAFE_RELEASE(m_pGeomBuffer2);
+    SAFE_RELEASE(m_pGeomBufferInst);
 
     SAFE_RELEASE(m_pTransBlendState);
     SAFE_RELEASE(m_pOpaqueBlendState);

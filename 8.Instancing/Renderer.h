@@ -12,6 +12,8 @@ class Renderer
     static const Point3f Rect0Pos;
     static const Point3f Rect1Pos;
 
+    static const int MaxInst = 100;
+
 public:
     Renderer()
         : m_pDevice(nullptr)
@@ -24,8 +26,7 @@ public:
         , m_pTransDepthState(nullptr)
         , m_width(16)
         , m_height(16)
-        , m_pGeomBuffer(nullptr)
-        , m_pGeomBuffer2(nullptr)
+        , m_pGeomBufferInst(nullptr)
         , m_pSceneBuffer(nullptr)
         , m_pVertexBuffer(nullptr)
         , m_pIndexBuffer(nullptr)
@@ -73,6 +74,8 @@ public:
         , m_showLightBulbs(true)
         , m_useNormalMaps(true)
         , m_showNormals(false)
+        , m_geomBuffers(MaxInst)
+        , m_instCount(2)
     {
         for (int i = 0; i < 10; i++)
         {
@@ -124,6 +127,13 @@ private:
         Point3f v[4];
     };
 
+    struct GeomBuffer
+    {
+        DirectX::XMMATRIX m;
+        DirectX::XMMATRIX normalM;
+        Point4f shine; // x - shininess
+    };
+
 private:
     HRESULT SetupBackBuffer();
     HRESULT InitScene();
@@ -131,6 +141,9 @@ private:
     HRESULT InitSmallSphere();
     HRESULT InitRect();
     HRESULT InitCubemap();
+
+    void UpdateCubes(double deltaSec);
+
     void TermScene();
 
     void RenderSphere();
@@ -154,14 +167,15 @@ private:
 
     ID3D11Buffer* m_pSceneBuffer;
 
-    // For cube
-    ID3D11Buffer* m_pGeomBuffer;
-    ID3D11Buffer* m_pGeomBuffer2; // Second cube transform
+    // For cubes
+    ID3D11Buffer* m_pGeomBufferInst;
     ID3D11Buffer* m_pVertexBuffer;
     ID3D11Buffer* m_pIndexBuffer;
     ID3D11PixelShader* m_pPixelShader;
     ID3D11VertexShader* m_pVertexShader;
     ID3D11InputLayout* m_pInputLayout;
+    std::vector<GeomBuffer> m_geomBuffers;
+    size_t m_instCount;
 
     // For sphere
     ID3D11Buffer* m_pSphereGeomBuffer;
