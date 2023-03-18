@@ -21,6 +21,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Common", "Common", "{33E52F
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "imgui", "Common\imgui\imgui.vcxproj", "{DC218CB9-C03B-4295-BDD6-3F833C933599}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "8.Instancing", "8.Instancing\8.Instancing.vcxproj", "{E57670ED-C535-4706-9BF3-9AEF7532F350}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -147,6 +149,20 @@ Global
 		{DC218CB9-C03B-4295-BDD6-3F833C933599}.Ship|x64.Build.0 = Debug|x64
 		{DC218CB9-C03B-4295-BDD6-3F833C933599}.Ship|x86.ActiveCfg = Debug|Win32
 		{DC218CB9-C03B-4295-BDD6-3F833C933599}.Ship|x86.Build.0 = Debug|Win32
+		{E57670ED-C535-4706-9BF3-9AEF7532F350}.Debug|x64.ActiveCfg = Debug|x64
+		{E57670ED-C535-4706-9BF3-9AEF7532F350}.Debug|x64.Build.0 = Debug|x64
+		{E57670ED-C535-4706-9BF3-9AEF7532F350}.Debug|x86.ActiveCfg = Debug|x64
+		{E57670ED-C535-4706-9BF3-9AEF7532F350}.Profile|x64.ActiveCfg = Debug|x64
+		{E57670ED-C535-4706-9BF3-9AEF7532F350}.Profile|x64.Build.0 = Debug|x64
+		{E57670ED-C535-4706-9BF3-9AEF7532F350}.Profile|x86.ActiveCfg = Debug|x64
+		{E57670ED-C535-4706-9BF3-9AEF7532F350}.Profile|x86.Build.0 = Debug|x64
+		{E57670ED-C535-4706-9BF3-9AEF7532F350}.Release|x64.ActiveCfg = Release|x64
+		{E57670ED-C535-4706-9BF3-9AEF7532F350}.Release|x64.Build.0 = Release|x64
+		{E57670ED-C535-4706-9BF3-9AEF7532F350}.Release|x86.ActiveCfg = Release|x64
+		{E57670ED-C535-4706-9BF3-9AEF7532F350}.Ship|x64.ActiveCfg = Debug|x64
+		{E57670ED-C535-4706-9BF3-9AEF7532F350}.Ship|x64.Build.0 = Debug|x64
+		{E57670ED-C535-4706-9BF3-9AEF7532F350}.Ship|x86.ActiveCfg = Debug|x64
+		{E57670ED-C535-4706-9BF3-9AEF7532F350}.Ship|x86.Build.0 = Debug|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
