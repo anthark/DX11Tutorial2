@@ -236,11 +236,8 @@ bool Renderer::Init(HWND hWnd)
     {
         m_camera.poi = Point3f{ 0,0,0 };
         m_camera.r = 5.0f;
-        // AAV TEMP
-        //m_camera.phi = -(float)M_PI/4;
-        //m_camera.theta = (float)M_PI/4;
-        m_camera.phi = 0.0f;
-        m_camera.theta = 0.0f;
+        m_camera.phi = -(float)M_PI/4;
+        m_camera.theta = (float)M_PI/4;
     }
 
     SAFE_RELEASE(pSelectedAdapter);
