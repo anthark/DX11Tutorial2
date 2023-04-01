@@ -464,7 +464,10 @@ bool Renderer::Render()
         if (m_computeCull)
         {
             m_pDeviceContext->CopyResource(m_pIndirectArgs, m_pIndirectArgsSrc);
+            m_pDeviceContext->Begin(m_queries[m_curFrame % 10]);
             m_pDeviceContext->DrawIndexedInstancedIndirect(m_pIndirectArgs, 0);
+            m_pDeviceContext->End(m_queries[m_curFrame % 10]);
+            ++m_curFrame;
         }
         else
         {
@@ -486,6 +489,8 @@ bool Renderer::Render()
     RenderRects();
 
     RenderPostProcess();
+
+    ReadQueries();
 
     // Start the Dear ImGui frame
     ImGui_ImplDX11_NewFrame();
@@ -537,7 +542,14 @@ bool Renderer::Render()
         ImGui::SameLine();
         remove = ImGui::Button("-");
         ImGui::Text("Count %d", m_instCount);
-        ImGui::Text("Visible %d", m_visibleInstances);
+        if (m_computeCull)
+        {
+            ImGui::Text("Visible (GPU) %d", m_gpuVisibleInstances);
+        }
+        else
+        {
+            ImGui::Text("Visible %d", m_visibleInstances);
+        }
         ImGui::Checkbox("Cull", &m_doCull);
         ImGui::Checkbox("Cull on GPU", &m_computeCull);
         ImGui::End();
@@ -1862,6 +1874,16 @@ HRESULT Renderer::InitCull()
             result = SetResourceName(m_pIndirectArgsSrc, "GeomBufferInstVisGPU_UAV");
         }
     }
+    if (SUCCEEDED(result))
+    {
+        D3D11_QUERY_DESC desc;
+        desc.Query = D3D11_QUERY_PIPELINE_STATISTICS;
+        desc.MiscFlags = 0;
+        for (int i = 0; i < 10 && SUCCEEDED(result); i++)
+        {
+            result = m_pDevice->CreateQuery(&desc, &m_queries[i]);
+        }
+    }
 
     assert(SUCCEEDED(result));
 
@@ -2003,6 +2025,10 @@ void Renderer::TermScene()
     SAFE_RELEASE(m_pIndirectArgsUAV);
     SAFE_RELEASE(m_pGeomBufferInstVisGPU);
     SAFE_RELEASE(m_pGeomBufferInstVisGPU_UAV);
+    for (int i = 0; i < 10; i++)
+    {
+        SAFE_RELEASE(m_queries[i]);
+    }
 }
 
 void Renderer::RenderSphere()
@@ -2126,6 +2152,25 @@ void Renderer::RenderPostProcess()
     m_pDeviceContext->PSSetShader(m_pSepiaPixelShader, nullptr, 0);
 
     m_pDeviceContext->Draw(3, 0);
+}
+
+void Renderer::ReadQueries()
+{
+    D3D11_QUERY_DATA_PIPELINE_STATISTICS stats;
+    while (m_lastCompletedFrame < m_curFrame)
+    {
+        HRESULT result = m_pDeviceContext->GetData(m_queries[m_lastCompletedFrame % 10], &stats, sizeof(D3D11_QUERY_DATA_PIPELINE_STATISTICS), 0);
+        if (result == S_OK)
+        {
+            m_gpuVisibleInstances = (int)stats.IAPrimitives / 12;
+
+            ++m_lastCompletedFrame;
+        }
+        else
+        {
+            break;
+        }
+    }
 }
 
 void Renderer::CalcFrustum(Point4f frustum[6])

@@ -96,10 +96,17 @@ public:
         , m_pGeomBufferInstVisGPU_UAV(nullptr)
         , m_pIndirectArgsUAV(nullptr)
         , m_updateCullParams(false)
+        , m_curFrame(0)
+        , m_lastCompletedFrame(0)
+        , m_gpuVisibleInstances(0)
     {
         for (int i = 0; i < 10; i++)
         {
             m_pSmallSphereGeomBuffers[i] = nullptr;
+        }
+        for (int i = 0; i < 10; i++)
+        {
+            m_queries[i] = nullptr;
         }
     }
 
@@ -192,6 +199,7 @@ private:
     void RenderSmallSpheres();
     void RenderRects();
     void RenderPostProcess();
+    void ReadQueries();
 
     void CalcFrustum(Point4f frutsum[6]);
     void CullBoxes();
@@ -280,6 +288,9 @@ private:
     ID3D11Buffer* m_pGeomBufferInstVisGPU;
     ID3D11UnorderedAccessView* m_pGeomBufferInstVisGPU_UAV;
     ID3D11UnorderedAccessView* m_pIndirectArgsUAV;
+    ID3D11Query* m_queries[10];
+    UINT64 m_curFrame;
+    UINT64 m_lastCompletedFrame;
 
     AABB m_boundingRects[2];
 
@@ -302,6 +313,8 @@ private:
     bool m_useSepia;
     bool m_computeCull;
     bool m_updateCullParams;
+
+    int m_gpuVisibleInstances;
 
     size_t m_prevUSec;
 
