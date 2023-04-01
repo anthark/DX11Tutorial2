@@ -42,6 +42,13 @@ struct RectGeomBuffer
     Point4f color;
 };
 
+struct CullParams
+{
+    Point4i shapeCount; // x - shapes count
+    Point4f bbMin[Renderer::MaxInst];
+    Point4f bbMax[Renderer::MaxInst];
+};
+
 static const float CameraRotationSpeed = (float)M_PI * 2.0f;
 static const float ModelRotationSpeed = (float)M_PI / 2.0f;
 
@@ -373,10 +380,27 @@ bool Renderer::Update()
     {
         m_sceneBuffer.vp = DirectX::XMMatrixMultiply(v, p);
         m_sceneBuffer.cameraPos = cameraPos;
+        CalcFrustum(m_sceneBuffer.frustum);
 
         memcpy(subresource.pData, &m_sceneBuffer, sizeof(SceneBuffer));
 
         m_pDeviceContext->Unmap(m_pSceneBuffer, 0);
+    }
+
+    // Update culling parameters
+    if (m_updateCullParams)
+    {
+        CullParams cullParams;
+        cullParams.shapeCount = m_instCount;
+        for (UINT i = 0; i < m_instCount; i++)
+        {
+            cullParams.bbMin[i] = m_geomBBs[i].vmin;
+            cullParams.bbMax[i] = m_geomBBs[i].vmax;
+        }
+
+        m_pDeviceContext->UpdateSubresource(m_pCullParams, 0, nullptr, &cullParams, 0, 0);
+
+        m_updateCullParams = false;
     }
 
     return SUCCEEDED(result);
@@ -437,7 +461,15 @@ bool Renderer::Render()
     m_pDeviceContext->PSSetShader(m_pPixelShader, nullptr, 0);
     if (m_doCull)
     {
-        m_pDeviceContext->DrawIndexedInstanced(36, m_visibleInstances, 0, 0, 0);
+        if (m_computeCull)
+        {
+            m_pDeviceContext->CopyResource(m_pIndirectArgs, m_pIndirectArgsSrc);
+            m_pDeviceContext->DrawIndexedInstancedIndirect(m_pIndirectArgs, 0);
+        }
+        else
+        {
+            m_pDeviceContext->DrawIndexedInstanced(36, m_visibleInstances, 0, 0, 0);
+        }
     }
     else
     {
@@ -507,6 +539,7 @@ bool Renderer::Render()
         ImGui::Text("Count %d", m_instCount);
         ImGui::Text("Visible %d", m_visibleInstances);
         ImGui::Checkbox("Cull", &m_doCull);
+        ImGui::Checkbox("Cull on GPU", &m_computeCull);
         ImGui::End();
         if (add && m_instCount < MaxInst)
         {
@@ -521,6 +554,7 @@ bool Renderer::Render()
         {
             --m_instCount;
         }
+        m_updateCullParams = add || remove;
     }
 
     // Rendering
@@ -920,6 +954,7 @@ HRESULT Renderer::InitScene()
                 InitGeom(m_geomBuffers[i], m_geomBBs[i]);
             }
             m_instCount = 10;
+            m_updateCullParams = true;
         }
     }
     // Create geometry visibility buffer
@@ -1213,6 +1248,10 @@ HRESULT Renderer::InitScene()
     if (SUCCEEDED(result))
     {
         result = InitPostProcess();
+    }
+    if (SUCCEEDED(result))
+    {
+        result = InitCull();
     }
 
     assert(SUCCEEDED(result));
@@ -1718,6 +1757,117 @@ HRESULT Renderer::InitPostProcess()
     return result;
 }
 
+HRESULT Renderer::InitCull()
+{
+    HRESULT result = S_OK;
+
+    // Create shader
+    result = CompileAndCreateShader(L"FrustumCull.cs", (ID3D11DeviceChild**)&m_pCullShader);
+    // Create indirect arguments buffer (for calculation)
+    if (SUCCEEDED(result))
+    {
+        D3D11_BUFFER_DESC desc;
+        desc.ByteWidth = sizeof(D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS);
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+        desc.StructureByteStride = sizeof(UINT);
+
+        result = m_pDevice->CreateBuffer(&desc, nullptr, &m_pIndirectArgsSrc);
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pIndirectArgsSrc, "IndirectArgsSrc");
+        }
+        if (SUCCEEDED(result))
+        {
+            D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc;
+            uavDesc.Format = DXGI_FORMAT_UNKNOWN;
+            uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+            uavDesc.Buffer.FirstElement = 0;
+            uavDesc.Buffer.NumElements = sizeof(D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS) / sizeof (UINT);
+            uavDesc.Buffer.Flags = 0;
+
+            result = m_pDevice->CreateUnorderedAccessView(m_pIndirectArgsSrc, &uavDesc, &m_pIndirectArgsUAV);
+        }
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pIndirectArgsSrc, "IndirectArgsUAV");
+        }
+    }
+    // Create indirect arguments buffer (for usage)
+    if (SUCCEEDED(result))
+    {
+        D3D11_BUFFER_DESC desc;
+        desc.ByteWidth = sizeof(D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS);
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = 0;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = D3D11_RESOURCE_MISC_DRAWINDIRECT_ARGS;
+        desc.StructureByteStride = 0;
+
+        result = m_pDevice->CreateBuffer(&desc, nullptr, &m_pIndirectArgs);
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pIndirectArgsSrc, "IndirectArgs");
+        }
+    }
+    // Create culling params buffer
+    if (SUCCEEDED(result))
+    {
+        D3D11_BUFFER_DESC desc;
+        desc.ByteWidth = sizeof(CullParams);
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = 0;
+        desc.StructureByteStride = 0;
+
+        result = m_pDevice->CreateBuffer(&desc, nullptr, &m_pCullParams);
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pCullParams, "CullParams");
+        }
+    }
+    // Create output buffer
+    if (SUCCEEDED(result))
+    {
+
+        D3D11_BUFFER_DESC desc = {};
+        desc.ByteWidth = sizeof(Point4i) * MaxInst;
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+        desc.StructureByteStride = sizeof(Point4i);
+
+        result = m_pDevice->CreateBuffer(&desc, nullptr, &m_pGeomBufferInstVisGPU);
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pGeomBufferInstVisGPU, "GeomBufferInstVisGPU");
+        }
+        if (SUCCEEDED(result))
+        {
+            D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc;
+            uavDesc.Format = DXGI_FORMAT_UNKNOWN;
+            uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+            uavDesc.Buffer.FirstElement = 0;
+            uavDesc.Buffer.NumElements = MaxInst;
+            uavDesc.Buffer.Flags = 0;
+
+            result = m_pDevice->CreateUnorderedAccessView(m_pGeomBufferInstVisGPU, &uavDesc, &m_pGeomBufferInstVisGPU_UAV);
+        }
+        if (SUCCEEDED(result))
+        {
+            result = SetResourceName(m_pIndirectArgsSrc, "GeomBufferInstVisGPU_UAV");
+        }
+    }
+
+    assert(SUCCEEDED(result));
+
+    return result;
+}
+
 void Renderer::UpdateCubes(double deltaSec)
 {
     if (m_rotateModel)
@@ -1844,6 +1994,15 @@ void Renderer::TermScene()
     {
         SAFE_RELEASE(m_pSmallSphereGeomBuffers[i]);
     }
+
+    // Term GPU culling setup
+    SAFE_RELEASE(m_pCullShader);
+    SAFE_RELEASE(m_pIndirectArgsSrc);
+    SAFE_RELEASE(m_pIndirectArgs);
+    SAFE_RELEASE(m_pCullParams);
+    SAFE_RELEASE(m_pIndirectArgsUAV);
+    SAFE_RELEASE(m_pGeomBufferInstVisGPU);
+    SAFE_RELEASE(m_pGeomBufferInstVisGPU_UAV);
 }
 
 void Renderer::RenderSphere()
@@ -1969,7 +2128,7 @@ void Renderer::RenderPostProcess()
     m_pDeviceContext->Draw(3, 0);
 }
 
-void Renderer::CullBoxes()
+void Renderer::CalcFrustum(Point4f frustum[6])
 {
     Point3f dir = -Point3f{ cosf(m_camera.theta) * cosf(m_camera.phi), sinf(m_camera.theta), cosf(m_camera.theta) * sinf(m_camera.phi) };
     float upTheta = m_camera.theta + (float)M_PI / 2;
@@ -1999,34 +2158,66 @@ void Renderer::CullBoxes()
     farVertices[2] = pos + dir * f + up * y + right * x;
     farVertices[3] = pos + dir * f + up * y - right * x;
 
-    Point4f frustum[6];
-
     frustum[0] = BuildPlane(nearVertices[0], nearVertices[1], nearVertices[2], nearVertices[3]);
     frustum[1] = BuildPlane(nearVertices[0], farVertices[0], farVertices[1], nearVertices[1]);
     frustum[2] = BuildPlane(nearVertices[1], farVertices[1], farVertices[2], nearVertices[2]);
     frustum[3] = BuildPlane(nearVertices[2], farVertices[2], farVertices[3], nearVertices[3]);
     frustum[4] = BuildPlane(nearVertices[3], farVertices[3], farVertices[0], nearVertices[0]);
     frustum[5] = BuildPlane(farVertices[1], farVertices[0], farVertices[3], farVertices[2]);
+}
 
-    std::vector<Point4i> ids(MaxInst);
-
-    m_visibleInstances = 0;
-    for (UINT i = 0; i < m_instCount; i++)
+void Renderer::CullBoxes()
+{
+    if (m_computeCull)
     {
-        if (IsBoxInside(frustum, m_geomBBs[i].vmin, m_geomBBs[i].vmax))
-        {
-            ids[m_visibleInstances].x = i;
-            ++m_visibleInstances;
-        }
+        D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS args;
+        args.IndexCountPerInstance = 36;
+        args.InstanceCount = 0;
+        args.StartIndexLocation = 0;
+        args.BaseVertexLocation = 0;
+        args.StartInstanceLocation = 0;
+
+        m_pDeviceContext->UpdateSubresource(m_pIndirectArgsSrc, 0, nullptr, &args, 0, 0);
+
+        UINT groupNumber = DivUp(m_instCount, 64u);
+
+        ID3D11Buffer* constBuffers[2] = {m_pSceneBuffer, m_pCullParams};
+        m_pDeviceContext->CSSetConstantBuffers(0, 2, constBuffers);
+
+        ID3D11UnorderedAccessView* uavBuffers[2] = {m_pIndirectArgsUAV, m_pGeomBufferInstVisGPU_UAV};
+        m_pDeviceContext->CSSetUnorderedAccessViews(0, 2, uavBuffers, nullptr);
+
+        m_pDeviceContext->CSSetShader(m_pCullShader, nullptr, 0);
+
+        m_pDeviceContext->Dispatch(groupNumber, 1, 1);
+
+        m_pDeviceContext->CopyResource(m_pGeomBufferInstVis, m_pGeomBufferInstVisGPU);
     }
-
-    D3D11_MAPPED_SUBRESOURCE subresource;
-    HRESULT hr = m_pDeviceContext->Map(m_pGeomBufferInstVis, 0, D3D11_MAP_WRITE_DISCARD, 0, &subresource);
-    assert(SUCCEEDED(hr));
-    if (SUCCEEDED(hr))
+    else
     {
-        memcpy(subresource.pData, ids.data(), sizeof(Point4i) * m_visibleInstances);
-        m_pDeviceContext->Unmap(m_pGeomBufferInstVis, 0);
+        Point4f frustum[6];
+        CalcFrustum(frustum);
+
+        std::vector<Point4i> ids(MaxInst);
+
+        m_visibleInstances = 0;
+        for (UINT i = 0; i < m_instCount; i++)
+        {
+            if (IsBoxInside(frustum, m_geomBBs[i].vmin, m_geomBBs[i].vmax))
+            {
+                ids[m_visibleInstances].x = i;
+                ++m_visibleInstances;
+            }
+        }
+
+        D3D11_MAPPED_SUBRESOURCE subresource;
+        HRESULT hr = m_pDeviceContext->Map(m_pGeomBufferInstVis, 0, D3D11_MAP_WRITE_DISCARD, 0, &subresource);
+        assert(SUCCEEDED(hr));
+        if (SUCCEEDED(hr))
+        {
+            memcpy(subresource.pData, ids.data(), sizeof(Point4i) * m_visibleInstances);
+            m_pDeviceContext->Unmap(m_pGeomBufferInstVis, 0);
+        }
     }
 }
 
@@ -2114,6 +2305,11 @@ HRESULT Renderer::CompileAndCreateShader(const std::wstring& path, ID3D11DeviceC
         entryPoint = "ps";
         platform = "ps_5_0";
     }
+    else if (ext == L"cs")
+    {
+        entryPoint = "cs";
+        platform = "cs_5_0";
+    }
 
     // Setup flags
     UINT flags1 = 0;
@@ -2163,6 +2359,15 @@ HRESULT Renderer::CompileAndCreateShader(const std::wstring& path, ID3D11DeviceC
             if (SUCCEEDED(result))
             {
                 *ppShader = pPixelShader;
+            }
+        }
+        else if (ext == L"cs")
+        {
+            ID3D11ComputeShader* pComputeShader = nullptr;
+            result = m_pDevice->CreateComputeShader(pCode->GetBufferPointer(), pCode->GetBufferSize(), nullptr, &pComputeShader);
+            if (SUCCEEDED(result))
+            {
+                *ppShader = pComputeShader;
             }
         }
     }

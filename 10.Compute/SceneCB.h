@@ -12,4 +12,5 @@ cbuffer SceneBuffer : register (b0)
     int4 postProcess; // x - use sepia
     Light lights[10];
     float4 ambientColor;
+    float4 frustum[6];
 };

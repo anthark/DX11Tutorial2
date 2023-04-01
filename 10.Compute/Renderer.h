@@ -12,6 +12,7 @@ class Renderer
     static const Point3f Rect0Pos;
     static const Point3f Rect1Pos;
 
+public:
     static const int MaxInst = 100;
 
 public:
@@ -86,6 +87,15 @@ public:
         , m_geomBBs(MaxInst)
         , m_instCount(2)
         , m_visibleInstances(0)
+        , m_computeCull(false)
+        , m_pCullShader(nullptr)
+        , m_pIndirectArgsSrc(nullptr)
+        , m_pIndirectArgs(nullptr)
+        , m_pCullParams(nullptr)
+        , m_pGeomBufferInstVisGPU(nullptr)
+        , m_pGeomBufferInstVisGPU_UAV(nullptr)
+        , m_pIndirectArgsUAV(nullptr)
+        , m_updateCullParams(false)
     {
         for (int i = 0; i < 10; i++)
         {
@@ -131,6 +141,7 @@ private:
         Point4i postProcess; // x - use sepia
         Light lights[10];
         Point4f ambientColor;
+        Point4f frustum[6];
     };
 
     struct AABB
@@ -169,6 +180,7 @@ private:
     HRESULT InitRect();
     HRESULT InitCubemap();
     HRESULT InitPostProcess();
+    HRESULT InitCull();
 
     void UpdateCubes(double deltaSec);
 
@@ -181,6 +193,7 @@ private:
     void RenderRects();
     void RenderPostProcess();
 
+    void CalcFrustum(Point4f frutsum[6]);
     void CullBoxes();
 
     HRESULT CompileAndCreateShader(const std::wstring& path, ID3D11DeviceChild** ppShader, const std::vector<std::string>& defines = {}, ID3DBlob** ppCode = nullptr);
@@ -260,6 +273,14 @@ private:
     ID3D11PixelShader* m_pSepiaPixelShader;
     ID3D11VertexShader* m_pSepiaVertexShader;
 
+    ID3D11ComputeShader* m_pCullShader;
+    ID3D11Buffer* m_pIndirectArgsSrc;
+    ID3D11Buffer* m_pIndirectArgs;
+    ID3D11Buffer* m_pCullParams;
+    ID3D11Buffer* m_pGeomBufferInstVisGPU;
+    ID3D11UnorderedAccessView* m_pGeomBufferInstVisGPU_UAV;
+    ID3D11UnorderedAccessView* m_pIndirectArgsUAV;
+
     AABB m_boundingRects[2];
 
     UINT m_width;
@@ -279,6 +300,8 @@ private:
     bool m_showNormals;
     bool m_doCull;
     bool m_useSepia;
+    bool m_computeCull;
+    bool m_updateCullParams;
 
     size_t m_prevUSec;
 
