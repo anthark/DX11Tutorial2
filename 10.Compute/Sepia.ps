@@ -1,0 +1,44 @@
+#include "SceneCB.h"
+
+struct VSOutput
+{
+    float4 pos : SV_Position;
+    float2 uv : TEXCOORD;
+};
+
+Texture2D colorTexture : register (t0);
+
+SamplerState colorSampler : register(s0);
+
+float4 ps(VSOutput pixel) : SV_Target0
+{
+    float3 color = colorTexture.Sample(colorSampler, pixel.uv).xyz;
+
+    if (postProcess.x == 0)
+    {
+        return float4(color, 1.0);
+    }
+
+    float rr = .3;
+    float rg = .769;
+    float rb = .189;
+    float ra = 0.0;
+    
+    float gr = .3;
+    float gg = .686;
+    float gb = .168;
+    float ga = 0.0;
+    
+    float br = .272;
+    float bg = .534;
+    float bb = .131;
+    float ba = 0.0;
+    
+    float red = (rr * color.r) + (rb * color.b) + (rg * color.g) + ra;
+    float green = (gr * color.r) + (gb * color.b) + (gg * color.g) + ga;
+    float blue = (br * color.r) + (bb * color.b) + (bg * color.g) + ba;
+
+    color = float3(red,green,blue);
+
+    return float4(color, 1);
+}
