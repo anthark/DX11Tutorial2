@@ -463,7 +463,6 @@ bool Renderer::Render()
     {
         if (m_computeCull)
         {
-            m_pDeviceContext->CopyResource(m_pIndirectArgs, m_pIndirectArgsSrc);
             m_pDeviceContext->Begin(m_queries[m_curFrame % 10]);
             m_pDeviceContext->DrawIndexedInstancedIndirect(m_pIndirectArgs, 0);
             m_pDeviceContext->End(m_queries[m_curFrame % 10]);
@@ -1793,14 +1792,14 @@ HRESULT Renderer::InitCull()
         }
         if (SUCCEEDED(result))
         {
-            D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc;
+            /*D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc;
             uavDesc.Format = DXGI_FORMAT_UNKNOWN;
             uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
             uavDesc.Buffer.FirstElement = 0;
             uavDesc.Buffer.NumElements = sizeof(D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS) / sizeof (UINT);
-            uavDesc.Buffer.Flags = 0;
+            uavDesc.Buffer.Flags = 0;*/
 
-            result = m_pDevice->CreateUnorderedAccessView(m_pIndirectArgsSrc, &uavDesc, &m_pIndirectArgsUAV);
+            result = m_pDevice->CreateUnorderedAccessView(m_pIndirectArgsSrc, nullptr, &m_pIndirectArgsUAV);
         }
         if (SUCCEEDED(result))
         {
@@ -1860,14 +1859,14 @@ HRESULT Renderer::InitCull()
         }
         if (SUCCEEDED(result))
         {
-            D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc;
+            /*D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc;
             uavDesc.Format = DXGI_FORMAT_UNKNOWN;
             uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
             uavDesc.Buffer.FirstElement = 0;
             uavDesc.Buffer.NumElements = MaxInst;
-            uavDesc.Buffer.Flags = 0;
+            uavDesc.Buffer.Flags = 0;*/
 
-            result = m_pDevice->CreateUnorderedAccessView(m_pGeomBufferInstVisGPU, &uavDesc, &m_pGeomBufferInstVisGPU_UAV);
+            result = m_pDevice->CreateUnorderedAccessView(m_pGeomBufferInstVisGPU, nullptr, &m_pGeomBufferInstVisGPU_UAV);
         }
         if (SUCCEEDED(result))
         {
@@ -2237,6 +2236,7 @@ void Renderer::CullBoxes()
         m_pDeviceContext->Dispatch(groupNumber, 1, 1);
 
         m_pDeviceContext->CopyResource(m_pGeomBufferInstVis, m_pGeomBufferInstVisGPU);
+        m_pDeviceContext->CopyResource(m_pIndirectArgs, m_pIndirectArgsSrc);
     }
     else
     {

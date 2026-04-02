@@ -767,9 +767,9 @@ HRESULT Renderer::InitScene()
         //desc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
         //desc.Filter = D3D11_FILTER_MIN_MAG_POINT_MIP_LINEAR;
         desc.Filter = D3D11_FILTER_ANISOTROPIC;
-        desc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
-        desc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
-        desc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+        desc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+        desc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+        desc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
         desc.MinLOD = -FLT_MAX;
         desc.MaxLOD = FLT_MAX;
         desc.MipLODBias = 0.0f;

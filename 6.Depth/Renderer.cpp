@@ -288,7 +288,9 @@ bool Renderer::Update()
         m_pDeviceContext->UpdateSubresource(m_pGeomBuffer, 0, nullptr, &geomBuffer, 0, 0);
 
         // Model matrix for second cube
+        // AAV TEMP Pos for depth fight
         m = DirectX::XMMatrixTranslation(2.0f, 0.0f, 0.0f);
+        //m = DirectX::XMMatrixTranslation(0.5f, 0.0001f, 0.0f);
         geomBuffer.m = m;
         m_pDeviceContext->UpdateSubresource(m_pGeomBuffer2, 0, nullptr, &geomBuffer, 0, 0);
     }
@@ -317,7 +319,9 @@ bool Renderer::Update()
     float fov = (float)M_PI / 3;
     float c = 1.0f / tanf(fov / 2);
     float aspectRatio = (float)m_height / m_width;
+    // AAV TEMP Reversed P matrix
     DirectX::XMMATRIX p = DirectX::XMMatrixPerspectiveLH(tanf(fov / 2) * 2 * f, tanf(fov / 2) * 2 * f * aspectRatio, f, n);
+    //DirectX::XMMATRIX p = DirectX::XMMatrixPerspectiveLH(tanf(fov / 2) * 2 * n, tanf(fov / 2) * 2 * n * aspectRatio, n, f);
 
     D3D11_MAPPED_SUBRESOURCE subresource;
     HRESULT result = m_pDeviceContext->Map(m_pSceneBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &subresource);
@@ -344,7 +348,9 @@ bool Renderer::Render()
 
     static const FLOAT BackColor[4] = { 0.25f, 0.25f, 0.25f, 1.0f };
     m_pDeviceContext->ClearRenderTargetView(m_pBackBufferRTV, BackColor);
+    // AAV TEMP Reversed clear
     m_pDeviceContext->ClearDepthStencilView(m_pDepthBufferDSV, D3D11_CLEAR_DEPTH, 0.0f, 0);
+    //m_pDeviceContext->ClearDepthStencilView(m_pDepthBufferDSV, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
     D3D11_VIEWPORT viewport;
     viewport.TopLeftX = 0;
@@ -393,6 +399,7 @@ bool Renderer::Render()
 
     RenderSphere();
 
+    // AAV TEMP Trans after
     RenderRects();
 
     HRESULT result = m_pSwapChain->Present(0, 0);
@@ -542,7 +549,9 @@ HRESULT Renderer::SetupBackBuffer()
     if (SUCCEEDED(result))
     {
         D3D11_TEXTURE2D_DESC desc;
+        // AAV TEMP Depth Format
         desc.Format = DXGI_FORMAT_D32_FLOAT;
+        //desc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
         desc.ArraySize = 1;
         desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
         desc.CPUAccessFlags = 0;
@@ -753,7 +762,9 @@ HRESULT Renderer::InitScene()
         D3D11_RASTERIZER_DESC desc = {};
         desc.AntialiasedLineEnable = FALSE;
         desc.FillMode = D3D11_FILL_SOLID;
+        // AAV TEMP Culling
         desc.CullMode = D3D11_CULL_NONE;
+        //desc.CullMode = D3D11_CULL_BACK;
         desc.FrontCounterClockwise = FALSE;
         desc.DepthBias = 0;
         desc.SlopeScaledDepthBias = 0.0f;
@@ -804,9 +815,12 @@ HRESULT Renderer::InitScene()
     if (SUCCEEDED(result))
     {
         D3D11_DEPTH_STENCIL_DESC desc = {};
+        // AAV TEMP Depth state
         desc.DepthEnable = TRUE;
+        //desc.DepthEnable = FALSE;
         desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
         desc.DepthFunc = D3D11_COMPARISON_GREATER_EQUAL;
+        //desc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
         desc.StencilEnable = FALSE;
 
         result = m_pDevice->CreateDepthStencilState(&desc, &m_pDepthState);
@@ -821,8 +835,11 @@ HRESULT Renderer::InitScene()
     {
         D3D11_DEPTH_STENCIL_DESC desc = {};
         desc.DepthEnable = TRUE;
+        // AAV TEMP Trans depth write
         desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+        //desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
         desc.DepthFunc = D3D11_COMPARISON_GREATER;
+        //desc.DepthFunc = D3D11_COMPARISON_LESS;
         desc.StencilEnable = FALSE;
 
         result = m_pDevice->CreateDepthStencilState(&desc, &m_pTransDepthState);
@@ -1367,8 +1384,20 @@ void Renderer::RenderRects()
     m_pDeviceContext->PSSetConstantBuffers(0, 2, cbuffers);
     m_pDeviceContext->PSSetShader(m_pRectPixelShader, nullptr, 0);
 
+    // AAV TEMP Trans sort
+    /*{
+        cbuffers[1] = m_pRectGeomBuffer;
+        m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
+        m_pDeviceContext->PSSetConstantBuffers(0, 2, cbuffers);
+        m_pDeviceContext->DrawIndexed(6, 0, 0);
+
+        cbuffers[1] = m_pRectGeomBuffer2;
+        m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
+        m_pDeviceContext->PSSetConstantBuffers(0, 2, cbuffers);
+        m_pDeviceContext->DrawIndexed(6, 0, 0);
+    }*/
     float d0 = 0.0f, d1 = 0.0f;
-    Point3f cameraPos = m_camera.poi + Point3f{ cosf(m_camera.theta) * cosf(m_camera.phi), sinf(m_camera.theta), cosf(m_camera.theta) * sinf(m_camera.phi) } *m_camera.r;
+    Point3f cameraPos = m_camera.poi + Point3f{cosf(m_camera.theta) * cosf(m_camera.phi), sinf(m_camera.theta), cosf(m_camera.theta) * sinf(m_camera.phi)} *m_camera.r;
     for (int i = 0; i < 4; i++)
     {
         d0 = std::max(d0, (cameraPos - m_boundingRects[0].v[i]).lengthSqr());

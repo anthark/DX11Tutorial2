@@ -27,6 +27,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "9.RenderTargets", "9.Render
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "10.Compute", "10.Compute\10.Compute.vcxproj", "{E661D2BF-4E7B-48F3-9BA5-92252F2D388F}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "11.Models", "11.Models\11.Models.vcxproj", "{D69DFEF8-F548-4B77-92A5-02E405600FCA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -195,6 +197,20 @@ Global
 		{E661D2BF-4E7B-48F3-9BA5-92252F2D388F}.Ship|x64.Build.0 = Debug|x64
 		{E661D2BF-4E7B-48F3-9BA5-92252F2D388F}.Ship|x86.ActiveCfg = Debug|x64
 		{E661D2BF-4E7B-48F3-9BA5-92252F2D388F}.Ship|x86.Build.0 = Debug|x64
+		{D69DFEF8-F548-4B77-92A5-02E405600FCA}.Debug|x64.ActiveCfg = Debug|x64
+		{D69DFEF8-F548-4B77-92A5-02E405600FCA}.Debug|x64.Build.0 = Debug|x64
+		{D69DFEF8-F548-4B77-92A5-02E405600FCA}.Debug|x86.ActiveCfg = Debug|x64
+		{D69DFEF8-F548-4B77-92A5-02E405600FCA}.Profile|x64.ActiveCfg = Debug|x64
+		{D69DFEF8-F548-4B77-92A5-02E405600FCA}.Profile|x64.Build.0 = Debug|x64
+		{D69DFEF8-F548-4B77-92A5-02E405600FCA}.Profile|x86.ActiveCfg = Debug|x64
+		{D69DFEF8-F548-4B77-92A5-02E405600FCA}.Profile|x86.Build.0 = Debug|x64
+		{D69DFEF8-F548-4B77-92A5-02E405600FCA}.Release|x64.ActiveCfg = Release|x64
+		{D69DFEF8-F548-4B77-92A5-02E405600FCA}.Release|x64.Build.0 = Release|x64
+		{D69DFEF8-F548-4B77-92A5-02E405600FCA}.Release|x86.ActiveCfg = Release|x64
+		{D69DFEF8-F548-4B77-92A5-02E405600FCA}.Ship|x64.ActiveCfg = Debug|x64
+		{D69DFEF8-F548-4B77-92A5-02E405600FCA}.Ship|x64.Build.0 = Debug|x64
+		{D69DFEF8-F548-4B77-92A5-02E405600FCA}.Ship|x86.ActiveCfg = Debug|x64
+		{D69DFEF8-F548-4B77-92A5-02E405600FCA}.Ship|x86.Build.0 = Debug|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

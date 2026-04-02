@@ -142,7 +142,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
         rc.top = 0;
         rc.bottom = WindowHeight;
 
-        AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, TRUE);
+        AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
 
         MoveWindow(hWnd, 100, 100, rc.right - rc.left, rc.bottom - rc.top, TRUE);
     }

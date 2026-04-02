@@ -180,6 +180,9 @@ bool Renderer::Update()
         // Angle is reversed, as DirectXMath calculates it as clockwise
         DirectX::XMMATRIX m = DirectX::XMMatrixRotationAxis(DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f), -(float)m_angle);
 
+        //DirectX::XMMATRIX offs = DirectX::XMMatrixTranslation(0.0f, 0.0f, 0.5f);
+        //m = DirectX::XMMatrixMultiply(m, offs);
+
         geomBuffer.m = m;
 
         m_pDeviceContext->UpdateSubresource(m_pGeomBuffer, 0, nullptr, &geomBuffer, 0, 0);
