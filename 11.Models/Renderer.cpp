@@ -2,6 +2,7 @@
 
 #include "Renderer.h"
 #include "DDS.h"
+#include "Model.h"
 
 #include <d3dcompiler.h>
 
@@ -273,6 +274,21 @@ bool Renderer::Init(HWND hWnd)
         m_sceneBuffer.ambientColor = Point4f(0,0,0.2f,0);
     }
 
+    if (SUCCEEDED(result))
+    {
+        LoadParams loadParams = {};
+        loadParams.pPlainVertexShaderCode = m_pModelVertexShaderCode;
+        loadParams.pTexturedVertexShaderCode = m_pTexturedModelVertexShaderCode;
+
+        bool modelLoadRes = LoadModel(m_pDevice, loadParams, "../Common/wolf_with_animations.glb", m_models);
+        //bool modelLoadRes = LoadModel(m_pDevice, loadParams, "../Common/black_dragon_with_idle_animation.glb", m_models);
+        if (!modelLoadRes)
+        {
+            Term();
+            return false;
+        }
+    }
+
     if (FAILED(result))
     {
         Term();
@@ -283,6 +299,8 @@ bool Renderer::Init(HWND hWnd)
 
 void Renderer::Term()
 {
+    m_models.clear();
+
     ImGui_ImplDX11_Shutdown();
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
@@ -292,6 +310,14 @@ void Renderer::Term()
     SAFE_RELEASE(m_pBackBufferRTV);
     SAFE_RELEASE(m_pSwapChain);
     SAFE_RELEASE(m_pDeviceContext);
+
+    SAFE_RELEASE(m_pModelVertexShaderCode);
+    SAFE_RELEASE(m_pModelVertexShader);
+    SAFE_RELEASE(m_pModelPixelShader);
+
+    SAFE_RELEASE(m_pTexturedModelVertexShaderCode);
+    SAFE_RELEASE(m_pTexturedModelVertexShader);
+    SAFE_RELEASE(m_pTexturedModelPixelShader);
 
 #ifdef _DEBUG
     if (m_pDevice != nullptr)
@@ -444,7 +470,7 @@ bool Renderer::Render()
     ID3D11SamplerState* samplers[] = {m_pSampler};
     m_pDeviceContext->PSSetSamplers(0, 1, samplers);
 
-    ID3D11ShaderResourceView* resources[] = {m_pTextureView, m_pTextureViewNM};
+    /*ID3D11ShaderResourceView* resources[] = {m_pTextureView, m_pTextureViewNM};
     m_pDeviceContext->PSSetShaderResources(0, 2, resources);
 
     m_pDeviceContext->IASetIndexBuffer(m_pIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
@@ -476,6 +502,46 @@ bool Renderer::Render()
     else
     {
         m_pDeviceContext->DrawIndexedInstanced(36, m_instCount, 0, 0, 0);
+    }*/
+
+
+    m_pDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    for (int i = 0; i < m_models.size(); i++)
+    {
+        ID3D11Buffer* cbuffers[] = { m_pSceneBuffer, m_models[i].pModelCB };
+        m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
+        m_pDeviceContext->PSSetConstantBuffers(0, 2, cbuffers);
+
+        for (int j = 0; j < m_models[i].splits.size(); j++)
+        {
+            const Split& split = m_models[i].splits[j];
+
+            if (split.textured)
+            {
+                m_pDeviceContext->PSSetShader(m_pTexturedModelPixelShader, nullptr, 0);
+                m_pDeviceContext->VSSetShader(m_pTexturedModelVertexShader, nullptr, 0);
+            }
+            else
+            {
+                m_pDeviceContext->PSSetShader(m_pModelPixelShader, nullptr, 0);
+                m_pDeviceContext->VSSetShader(m_pModelVertexShader, nullptr, 0);
+            }
+
+            std::vector<ID3D11ShaderResourceView*> textures;
+            for (const auto& tex : split.textures)
+            {
+                textures.push_back(tex.second);
+            }
+            m_pDeviceContext->PSSetShaderResources(0, (UINT)textures.size(), textures.data());
+
+            m_pDeviceContext->IASetIndexBuffer(split.pIndexBuffer, split.indexFormat, 0);
+            ID3D11Buffer* vertexBuffers[] = { split.pVertexBuffer };
+            UINT strides[] = { split.vertexStride };
+            UINT offsets[] = { 0 };
+            m_pDeviceContext->IASetVertexBuffers(0, 1, vertexBuffers, strides, offsets);
+            m_pDeviceContext->IASetInputLayout(split.pInputLayout);
+            m_pDeviceContext->DrawIndexed(split.indexCount, 0, 0);
+        }
     }
 
     if (m_showLightBulbs)
@@ -913,6 +979,24 @@ HRESULT Renderer::InitScene()
     }
 
     SAFE_RELEASE(pVertexShaderCode);
+
+    if (SUCCEEDED(result))
+    {
+        result = CompileAndCreateShader(L"Model.vs", (ID3D11DeviceChild**)&m_pModelVertexShader, {}, &m_pModelVertexShaderCode);
+    }
+    if (SUCCEEDED(result))
+    {
+        result = CompileAndCreateShader(L"Model.ps", (ID3D11DeviceChild**)&m_pModelPixelShader);
+    }
+
+    if (SUCCEEDED(result))
+    {
+        result = CompileAndCreateShader(L"ModelTextured.vs", (ID3D11DeviceChild**)&m_pTexturedModelVertexShader, {}, &m_pTexturedModelVertexShaderCode);
+    }
+    if (SUCCEEDED(result))
+    {
+        result = CompileAndCreateShader(L"ModelTextured.ps", (ID3D11DeviceChild**)&m_pTexturedModelPixelShader);
+    }
 
     // Create geometry buffer
     if (SUCCEEDED(result))

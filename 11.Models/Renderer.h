@@ -5,6 +5,8 @@
 
 #include "../Math/Point.h"
 
+#include "Model.h"
+
 class Renderer
 {
     static const double PanSpeed;
@@ -221,6 +223,14 @@ private:
 
     ID3D11Buffer* m_pSceneBuffer;
 
+    // For models
+    ID3D11PixelShader* m_pModelPixelShader;
+    ID3D11VertexShader* m_pModelVertexShader;
+    ID3DBlob* m_pModelVertexShaderCode;
+    ID3D11PixelShader* m_pTexturedModelPixelShader;
+    ID3D11VertexShader* m_pTexturedModelVertexShader;
+    ID3DBlob* m_pTexturedModelVertexShaderCode;
+
     // For cubes
     ID3D11Buffer* m_pGeomBufferInst;
     ID3D11Buffer* m_pGeomBufferInstVis;
@@ -319,4 +329,6 @@ private:
     size_t m_prevUSec;
 
     SceneBuffer m_sceneBuffer;
+
+    std::vector<Model> m_models;
 };

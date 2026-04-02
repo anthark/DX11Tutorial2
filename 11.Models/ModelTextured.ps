@@ -1,0 +1,21 @@
+Texture2D colorTexture : register (t0);
+//Texture2D normalMapTexture : register (t1);
+
+SamplerState colorSampler : register(s0);
+
+struct VSOutput
+{
+    float4 pos : SV_Position;
+    float3 norm : NORMAL;
+    float2 uv: TEXCOORD;
+};
+
+float4 ps(VSOutput pixel) : SV_Target0
+{
+    float4 color = colorTexture.Sample(colorSampler, pixel.uv);
+    if (color.w < 0.5)
+    {
+        discard;
+    }
+    return color;
+}
