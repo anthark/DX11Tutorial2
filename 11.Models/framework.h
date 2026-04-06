@@ -18,6 +18,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 
 #include <dxgi.h>
 #include <d3d11.h>

@@ -229,7 +229,9 @@ private:
     ID3DBlob* m_pModelVertexShaderCode;
     ID3D11PixelShader* m_pTexturedModelPixelShader;
     ID3D11VertexShader* m_pTexturedModelVertexShader;
+    ID3D11VertexShader* m_pAnimatedTexturedModelVertexShader;
     ID3DBlob* m_pTexturedModelVertexShaderCode;
+    ID3DBlob* m_pAnimatedTexturedModelVertexShaderCode;
 
     // For cubes
     ID3D11Buffer* m_pGeomBufferInst;
@@ -330,5 +332,6 @@ private:
 
     SceneBuffer m_sceneBuffer;
 
-    std::vector<Model> m_models;
+    Model m_model;
+    std::vector<const char*> m_animList;
 };

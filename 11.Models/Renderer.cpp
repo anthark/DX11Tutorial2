@@ -279,14 +279,22 @@ bool Renderer::Init(HWND hWnd)
         LoadParams loadParams = {};
         loadParams.pPlainVertexShaderCode = m_pModelVertexShaderCode;
         loadParams.pTexturedVertexShaderCode = m_pTexturedModelVertexShaderCode;
+        loadParams.pAnimatedTexturedVertexShaderCode = m_pAnimatedTexturedModelVertexShaderCode;
 
-        bool modelLoadRes = LoadModel(m_pDevice, loadParams, "../Common/wolf_with_animations.glb", m_models);
-        //bool modelLoadRes = LoadModel(m_pDevice, loadParams, "../Common/black_dragon_with_idle_animation.glb", m_models);
+        //bool modelLoadRes = LoadModel(m_pDevice, loadParams, "../Common/wolf_with_animations.glb", m_model);
+        //bool modelLoadRes = LoadModel(m_pDevice, loadParams, "../Common/black_dragon_with_idle_animation.glb", m_model);
+        bool modelLoadRes = LoadModel(m_pDevice, loadParams, "../Common/mech_drone.glb", m_model);
         if (!modelLoadRes)
         {
             Term();
             return false;
         }
+        for (const auto& anim : m_model.animations)
+        {
+            m_animList.push_back(anim.first.c_str());
+        }
+        m_model.currentAnim = 0;
+        m_model.curAnimName = m_animList[m_model.currentAnim];
     }
 
     if (FAILED(result))
@@ -299,7 +307,7 @@ bool Renderer::Init(HWND hWnd)
 
 void Renderer::Term()
 {
-    m_models.clear();
+    m_model.meshes.clear();
 
     ImGui_ImplDX11_Shutdown();
     ImGui_ImplWin32_Shutdown();
@@ -315,6 +323,8 @@ void Renderer::Term()
     SAFE_RELEASE(m_pModelVertexShader);
     SAFE_RELEASE(m_pModelPixelShader);
 
+    SAFE_RELEASE(m_pAnimatedTexturedModelVertexShaderCode);
+    SAFE_RELEASE(m_pAnimatedTexturedModelVertexShader);
     SAFE_RELEASE(m_pTexturedModelVertexShaderCode);
     SAFE_RELEASE(m_pTexturedModelVertexShader);
     SAFE_RELEASE(m_pTexturedModelPixelShader);
@@ -350,6 +360,19 @@ bool Renderer::Update()
     }
 
     double deltaSec = (usec - m_prevUSec) / 1000000.0;
+
+    if (m_model.animStart)
+    {
+        m_model.animStart = false;
+    }
+    else
+    {
+        // AAV TEMP: No animation
+        //m_model.animationTime += deltaSec / 100;
+        m_model.animationTime = 0.05f;
+    }
+    m_model.ApplyAnimation();
+    m_model.UpdateMatrices(m_pDeviceContext);
 
     // Move camera
     {
@@ -506,20 +529,27 @@ bool Renderer::Render()
 
 
     m_pDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    for (int i = 0; i < m_models.size(); i++)
+    for (int i = 0; i < m_model.meshes.size(); i++)
     {
-        ID3D11Buffer* cbuffers[] = { m_pSceneBuffer, m_models[i].pModelCB };
-        m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
-        m_pDeviceContext->PSSetConstantBuffers(0, 2, cbuffers);
+        ID3D11Buffer* cbuffers[] = { m_pSceneBuffer, m_model.meshes[i].pModelCB, m_model.pCB };
+        m_pDeviceContext->VSSetConstantBuffers(0, 3, cbuffers);
+        m_pDeviceContext->PSSetConstantBuffers(0, 3, cbuffers);
 
-        for (int j = 0; j < m_models[i].splits.size(); j++)
+        for (int j = 0; j < m_model.meshes[i].splits.size(); j++)
         {
-            const Split& split = m_models[i].splits[j];
+            const Model::Split& split = m_model.meshes[i].splits[j];
 
             if (split.textured)
             {
+                if (split.animated)
+                {
+                    m_pDeviceContext->VSSetShader(m_pTexturedModelVertexShader, nullptr, 0);
+                }
+                else
+                {
+                    m_pDeviceContext->VSSetShader(m_pAnimatedTexturedModelVertexShader, nullptr, 0);
+                }
                 m_pDeviceContext->PSSetShader(m_pTexturedModelPixelShader, nullptr, 0);
-                m_pDeviceContext->VSSetShader(m_pTexturedModelVertexShader, nullptr, 0);
             }
             else
             {
@@ -618,6 +648,17 @@ bool Renderer::Render()
         ImGui::Checkbox("Cull", &m_doCull);
         ImGui::Checkbox("Cull on GPU", &m_computeCull);
         ImGui::End();
+
+        int anim = m_model.currentAnim;
+        ImGui::Begin("Animation");
+        ImGui::ListBox("Animations", &anim, m_animList.data(), (int)m_animList.size());
+        ImGui::End();
+        if (anim != m_model.currentAnim)
+        {
+            m_model.currentAnim = anim;
+            m_model.animStart = true;
+        }
+
         if (add && m_instCount < MaxInst)
         {
             Point4f pos = m_geomBuffers[m_instCount].posAngle;
@@ -992,6 +1033,10 @@ HRESULT Renderer::InitScene()
     if (SUCCEEDED(result))
     {
         result = CompileAndCreateShader(L"ModelTextured.vs", (ID3D11DeviceChild**)&m_pTexturedModelVertexShader, {}, &m_pTexturedModelVertexShaderCode);
+    }
+    if (SUCCEEDED(result))
+    {
+        result = CompileAndCreateShader(L"ModelTextured.vs", (ID3D11DeviceChild**)&m_pAnimatedTexturedModelVertexShader, {"ANIMATION"}, &m_pAnimatedTexturedModelVertexShaderCode);
     }
     if (SUCCEEDED(result))
     {
